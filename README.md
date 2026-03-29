@@ -1,57 +1,82 @@
-Stress Prediction Using Machine Learning
-----
+📌 Smart City Pollution Predictor
 Author
-Suhani Bode
-----
+Shraddha Bankar
+
 Affiliation
-Computer Science and Engineering(Data Science)
----
+Computer Science Engineering (Data Science)
+
 Date
 March 2026
----
 
+📖 Abstract
+Air pollution is becoming a serious problem in modern cities and it directly affects people’s health and the environment. This project focuses on predicting pollution levels using machine learning so that actions can be taken in advance.
 
-Abstract
+The system uses past data such as temperature, humidity, and pollution levels like PM2.5 and PM10. First, the data is cleaned and prepared, and then machine learning models like Linear Regression and Random Forest are applied.
 
-This project focuses on predicting stress levels using machine learning techniques based on user behavioral and lifestyle data. The model analyzes factors such as sleep patterns, work hours, and daily activities to classify stress levels. The goal is to provide early detection and help individuals manage stress effectively.
----
-Introduction
+The results show that the system can predict pollution levels with good accuracy. This can help smart cities plan better and take steps to control pollution before it becomes harmful.
 
-Stress has become a common issue in modern life, affecting both mental and physical health. With the advancement of machine learning, it is possible to predict stress levels using data-driven approaches. This project aims to develop a system that can predict stress levels and provide insights for better lifestyle management.
+📘 Introduction
+In today’s cities, pollution is increasing due to traffic, industries, and population growth. This leads to many health problems like breathing issues and lung diseases.
 
----
-Literature Review
+The aim of this project is to build a system that can predict future pollution levels using past data. By knowing pollution levels in advance, authorities can take preventive actions.
 
-Previous research has shown that stress prediction can be performed using classification algorithms such as Decision Trees, Random Forest, and Support Vector Machines. Studies also highlight the importance of behavioral data in identifying stress patterns.
+This project is important because it helps in creating a cleaner and safer environment for people living in cities.
 
-----
-Methodology
-Data collection (lifestyle, sleep, work hours)
-Data preprocessing (handling missing values, normalization)
-Feature selection
-Model training (Random Forest, Logistic Regression)
-Model evaluation (accuracy, precision, recall)
-----
-Implementation
-Tools: Python, Pandas, Scikit-learn
-Dataset preprocessing and visualization
-Model training and testing
-Deployment using a simple UI (optional)
----
-Result and Discussion
+📘 Literature Review
+Many researchers have worked on predicting air pollution using different methods. Some use simple statistical models, while others use machine learning techniques like Random Forest and Support Vector Machine.
 
-The model achieved good accuracy in predicting stress levels. Random Forest performed better compared to other models. The results show that lifestyle factors significantly influence stress levels
-----
-Future Scope
-Integration with wearable devices
-Real-time stress monitoring
-Mobile application development
+Some systems also use sensors to collect real-time data. However, many existing solutions use limited data or focus on only one type of pollutant.
 
-🔹 Conclusion
+In this project, multiple factors like temperature, humidity, and different pollutants are used together, which improves the prediction accuracy.
 
-The project successfully demonstrates that machine learning can be used to predict stress levels effectively. It can help individuals take preventive actions.
+⚙️ Methodology
+The system takes past pollution and weather data as input. First, the data is cleaned by removing missing or incorrect values. Then, the data is normalized so all values are in a similar range.
 
-🔹 Reference
-1) Research papers on stress prediction
-2) Scikit-learn documentation
-3) Kaggle datasets
+Important features like temperature, humidity, and pollution levels are selected. The data is divided into training and testing sets.
+
+Machine learning models like Linear Regression and Random Forest are trained and tested. Finally, the best model is used to predict future pollution levels.
+
+💻 Implementation
+Programming Language
+
+Python
+Libraries Used
+
+NumPy
+Pandas
+Scikit-learn
+Matplotlib / Seaborn
+Tools Used
+
+Jupyter Notebook
+Google Colab
+VS Code
+GitHub
+📊 Results and Discussion
+The models were trained and tested successfully. Random Forest performed better than Linear Regression in most cases.
+
+The system can predict pollution levels with good accuracy. Graphs help in understanding how pollution changes over time.
+
+This shows that machine learning can be useful in solving real-world environmental problems.
+
+⚠️ Limitation
+Small dataset may reduce accuracy
+No real-time data is used
+Some important factors like traffic and industry are not included
+Results depend on data quality
+🚀 Future Scope
+Use real-time data from sensors
+Apply deep learning for better results
+Build a mobile or web application
+Expand the system for multiple cities
+Add more environmental factors
+✅ Conclusion
+This project shows that machine learning can help predict air pollution in cities.
+
+The system is simple, useful, and can support smart city development. With more improvements, it can help reduce pollution and protect public health.
+
+📎 References
+[1] Air Pollution Prediction Using Machine Learning, 2021
+[2] Smart City Environmental Monitoring Systems, 2020
+[3] https://scikit-learn.org/
+[4] https://www.kaggle.com/
