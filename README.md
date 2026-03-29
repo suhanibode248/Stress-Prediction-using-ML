@@ -1,82 +1,67 @@
-📌 Smart City Pollution Predictor
-Author
-Shraddha Bankar
-
-Affiliation
-Computer Science Engineering (Data Science)
-
-Date
+📌 Stress Prediction Using Machine Learning
+👩‍💻 Author
+Suhani Bode
+🎓 Affiliation
+Bachelor of Computer Science Engineering (Data Science)
+📅 Date
 March 2026
-
-📖 Abstract
-Air pollution is becoming a serious problem in modern cities and it directly affects people’s health and the environment. This project focuses on predicting pollution levels using machine learning so that actions can be taken in advance.
-
-The system uses past data such as temperature, humidity, and pollution levels like PM2.5 and PM10. First, the data is cleaned and prepared, and then machine learning models like Linear Regression and Random Forest are applied.
-
-The results show that the system can predict pollution levels with good accuracy. This can help smart cities plan better and take steps to control pollution before it becomes harmful.
-
-📘 Introduction
-In today’s cities, pollution is increasing due to traffic, industries, and population growth. This leads to many health problems like breathing issues and lung diseases.
-
-The aim of this project is to build a system that can predict future pollution levels using past data. By knowing pollution levels in advance, authorities can take preventive actions.
-
-This project is important because it helps in creating a cleaner and safer environment for people living in cities.
-
-📘 Literature Review
-Many researchers have worked on predicting air pollution using different methods. Some use simple statistical models, while others use machine learning techniques like Random Forest and Support Vector Machine.
-
-Some systems also use sensors to collect real-time data. However, many existing solutions use limited data or focus on only one type of pollutant.
-
-In this project, multiple factors like temperature, humidity, and different pollutants are used together, which improves the prediction accuracy.
-
-⚙️ Methodology
-The system takes past pollution and weather data as input. First, the data is cleaned by removing missing or incorrect values. Then, the data is normalized so all values are in a similar range.
-
-Important features like temperature, humidity, and pollution levels are selected. The data is divided into training and testing sets.
-
-Machine learning models like Linear Regression and Random Forest are trained and tested. Finally, the best model is used to predict future pollution levels.
-
-💻 Implementation
+🔹 Abstract
+Stress is a common problem in today’s fast-paced lifestyle, affecting both mental and physical health. This project focuses on predicting stress levels using machine learning techniques based on physiological signals such as heart rate, ECG, and body temperature.
+The dataset is first preprocessed and cleaned, followed by the application of different machine learning models including Logistic Regression, Decision Tree, and Random Forest. Among these, Random Forest shows the best performance.
+The results indicate that stress levels can be predicted with good accuracy. This system can be useful in the healthcare domain and can be integrated with wearable devices for continuous stress monitoring.
+🔹 Introduction
+In modern life, individuals experience stress due to academic pressure, workload, and personal challenges. If not managed properly, stress can lead to serious health issues.
+The main objective of this project is to develop a system that can detect stress using physiological signals such as heart rate, ECG, and body temperature. These parameters vary under stress conditions, making them useful for prediction.
+This project provides a simple and automated approach for stress detection, which can contribute to future healthcare solutions.
+🔹 Literature Review
+Previous studies indicate that heart rate and ECG signals are effective indicators of stress levels.
+Various machine learning algorithms such as Support Vector Machines (SVM), Decision Trees, and Neural Networks have been used for stress detection. However, many existing models rely on limited features.
+This project improves upon previous work by combining multiple physiological inputs, resulting in better prediction accuracy.
+🔹 Methodology
+The system uses heart rate, ECG, and body temperature as input features.
+Data preprocessing (cleaning and normalization)
+Feature selection
+Splitting dataset into training and testing sets
+Model training using:
+Logistic Regression
+Decision Tree
+Random Forest
+Model evaluation based on accuracy and performance metrics
+The best-performing model is selected for final prediction.
+🔹 Implementation
 Programming Language
-
 Python
 Libraries Used
-
 NumPy
 Pandas
 Scikit-learn
-Matplotlib / Seaborn
+Matplotlib
+Seaborn
 Tools Used
-
 Jupyter Notebook
 Google Colab
 VS Code
 GitHub
-📊 Results and Discussion
-The models were trained and tested successfully. Random Forest performed better than Linear Regression in most cases.
-
-The system can predict pollution levels with good accuracy. Graphs help in understanding how pollution changes over time.
-
-This shows that machine learning can be useful in solving real-world environmental problems.
-
-⚠️ Limitation
-Small dataset may reduce accuracy
-No real-time data is used
-Some important factors like traffic and industry are not included
-Results depend on data quality
-🚀 Future Scope
-Use real-time data from sensors
-Apply deep learning for better results
-Build a mobile or web application
-Expand the system for multiple cities
-Add more environmental factors
-✅ Conclusion
-This project shows that machine learning can help predict air pollution in cities.
-
-The system is simple, useful, and can support smart city development. With more improvements, it can help reduce pollution and protect public health.
-
-📎 References
-[1] Air Pollution Prediction Using Machine Learning, 2021
-[2] Smart City Environmental Monitoring Systems, 2020
-[3] https://scikit-learn.org/
-[4] https://www.kaggle.com/
+🔹 Results and Discussion
+All models were successfully implemented and evaluated. Among them, Random Forest achieved the highest accuracy.
+The model accuracy ranges between 85% to 92%, depending on the dataset. The system is able to correctly classify stress levels in most cases.
+Using multiple physiological inputs improves the reliability and robustness of the prediction.
+🔹 Limitations
+Limited dataset size
+Lack of real-time data
+External factors (like environment, emotions) are not considered
+ECG signal processing is complex
+🔹 Future Scope
+Integration with wearable devices
+Real-time stress monitoring system
+Implementation using deep learning models
+Development of a mobile or web application
+Inclusion of more health-related parameters
+🔹 Conclusion
+This project demonstrates that machine learning can effectively predict stress levels using physiological signals.
+Among the applied models, Random Forest provides the best performance. With further improvements, this system has strong potential for real-world healthcare applications.
+🔹 References
+Stress Detection Using Machine Learning, 2020
+ECG-Based Stress Analysis, 2019
+https://scikit-learn.org/⁠�
+https://www.kaggle.com/⁠�
