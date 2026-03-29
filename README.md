@@ -1,4 +1,4 @@
-# 📌 Stress Prediction Using Machine Learning
+#  Stress Prediction Using Machine Learning
 
 ### 👩‍💻 Author  
 Suhani Bode  
