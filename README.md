@@ -1,11 +1,11 @@
 #  Stress Prediction Using Machine Learning
-
+---
 ###  Author  
 Suhani Bode  
-
+---
 ###  Affiliation  
 Computer Science Engineering (Data Science)  
-
+---
 ###  Date  
 March 2026  
 
