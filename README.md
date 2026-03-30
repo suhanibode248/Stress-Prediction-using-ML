@@ -11,7 +11,7 @@ March 2026
 
 ---
 
-## 🔹 Abstract  
+##  Abstract  
 Stress is a common problem in today’s fast-paced lifestyle, affecting both mental and physical health.  
 
 This project focuses on predicting stress levels using machine learning techniques based on physiological signals such as heart rate, ECG, and body temperature.  
@@ -22,7 +22,7 @@ Among these, Random Forest gives the best performance. The results show that str
 
 ---
 
-## 🔹 Introduction  
+##  Introduction  
 In modern life, individuals experience stress due to academic pressure, workload, and personal challenges.  
 
 If not managed properly, it can lead to serious health problems.  
@@ -31,14 +31,14 @@ The aim of this project is to develop a system that can detect stress using phys
 
 ---
 
-## 🔹 Literature Review  
+##  Literature Review  
 Many studies show that heart rate and ECG are strong indicators of stress.  
 
 Machine learning models such as SVM, Decision Tree, and Neural Networks have been used earlier.  
 
 ---
 
-## 🔹 Methodology  
+##  Methodology  
 - Data preprocessing  
 - Feature selection  
 - Train-test split  
@@ -49,7 +49,7 @@ Machine learning models such as SVM, Decision Tree, and Neural Networks have bee
 
 ---
 
-## 🔹 Implementation  
+##  Implementation  
 
 **Programming Language:** Python  
 
@@ -62,35 +62,35 @@ Machine learning models such as SVM, Decision Tree, and Neural Networks have bee
 
 ---
 
-## 🔹 Results and Discussion  
+##  Results and Discussion  
 Random Forest performed the best among all models.  
 
 Accuracy ranges between **85%–92%**.  
 
 ---
 
-## 🔹 Limitations  
+##  Limitations  
 - Small dataset  
 - No real-time data  
 - External factors not included  
 
 ---
 
-## 🔹 Future Scope  
+##  Future Scope  
 - Wearable integration  
 - Real-time monitoring  
 - Mobile app development  
 
 ---
 
-## 🔹 Conclusion  
+##  Conclusion  
 Machine learning can effectively predict stress levels.  
 
 Random Forest provides the best results in this project.  
 
 ---
 
-## 🔹 References  
+##  References  
 1. Stress Detection Using Machine Learning, 2020  
 2. ECG-Based Stress Analysis, 2019  
 3. https://scikit-learn.org/  
