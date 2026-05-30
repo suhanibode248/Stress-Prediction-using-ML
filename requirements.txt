@@ -1,0 +1,7 @@
+flask
+opencv-python
+mediapipe
+numpy
+librosa
+sounddevice
+scipy
