@@ -20,9 +20,7 @@ load_dotenv()
 
 # ── App setup ─────────────────────────────────────────────────────────────
 app = Flask(__name__)
-app.config.update(
-    SECRET_KEY               = os.environ.get("SECRET_KEY", "neuroscan-dev-change-me"),
-    SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL"),
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL"),
     SQLALCHEMY_TRACK_MODIFICATIONS = False,
     PERMANENT_SESSION_LIFETIME = timedelta(days=7),
 )
