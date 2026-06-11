@@ -26,7 +26,8 @@ app.config.update(
     SQLALCHEMY_DATABASE_URI=os.environ.get("DATABASE_URL"),
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
     PERMANENT_SESSION_LIFETIME=timedelta(days=7),
-  
+)
+
 print("DATABASE_URL:", os.environ.get("DATABASE_URL"))
 db            = SQLAlchemy(app)
 login_manager = LoginManager(app)
