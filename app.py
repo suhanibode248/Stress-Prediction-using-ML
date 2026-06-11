@@ -22,7 +22,7 @@ load_dotenv()
 app = Flask(__name__)
 app.config.update(
     SECRET_KEY               = os.environ.get("SECRET_KEY", "neuroscan-dev-change-me"),
-    SQLALCHEMY_DATABASE_URI  = "sqlite:///neuroscan.db",
+    SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL"),
     SQLALCHEMY_TRACK_MODIFICATIONS = False,
     PERMANENT_SESSION_LIFETIME = timedelta(days=7),
 )
@@ -425,8 +425,8 @@ def emotions_summary():
 
 
 # ── Init DB ───────────────────────────────────────────────────────────────
-with app.app_context():
-    db.create_all()
-
 if __name__ == "__main__":
+    with app.app_context():
+        db.create_all()
+
     app.run(debug=True, port=5000)
