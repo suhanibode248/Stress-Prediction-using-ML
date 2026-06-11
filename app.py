@@ -20,9 +20,13 @@ load_dotenv()
 
 # ── App setup ─────────────────────────────────────────────────────────────
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL"),
-    SQLALCHEMY_TRACK_MODIFICATIONS = False,
-    PERMANENT_SESSION_LIFETIME = timedelta(days=7),
+
+app.config.update(
+    SECRET_KEY=os.environ.get("SECRET_KEY", "neuroscan_stress_prediction_2026_secret"),
+    SQLALCHEMY_DATABASE_URI=os.environ.get("DATABASE_URL"),
+    SQLALCHEMY_TRACK_MODIFICATIONS=False,
+    PERMANENT_SESSION_LIFETIME=timedelta(days=7),
+
 )
 
 db            = SQLAlchemy(app)
