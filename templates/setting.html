@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeuroScan — Settings</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#03070f;--panel:#080f1e;--panel2:#0d1828;--border:rgba(56,189,248,.1);--border2:rgba(56,189,248,.22);--accent:#38bdf8;--accent2:#6366f1;--green:#34d399;--warn:#fbbf24;--danger:#f87171;--text:#e2e8f0;--muted:#475569;--muted2:#64748b;--fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--sb:68px;--tb:62px}
+body{background:var(--bg);color:var(--text);font-family:var(--fm);min-height:100vh}
+.bg-mesh{position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(ellipse 900px 600px at 5% 10%,rgba(56,189,248,.03),transparent),radial-gradient(ellipse 700px 500px at 95% 90%,rgba(99,102,241,.04),transparent)}
+.bg-grid{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:linear-gradient(rgba(56,189,248,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(56,189,248,.02) 1px,transparent 1px);background-size:48px 48px}
+.sidebar{position:fixed;top:0;left:0;bottom:0;width:var(--sb);background:rgba(8,15,30,.95);backdrop-filter:blur(12px);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:16px 0;z-index:60}
+.sb-logo{width:40px;height:40px;border-radius:11px;margin-bottom:24px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(56,189,248,.25)}
+.nav{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer;transition:all .2s;position:relative;margin-bottom:4px;border:1px solid transparent;text-decoration:none}
+.nav:hover,.nav.on{color:var(--accent);background:rgba(56,189,248,.08);border-color:var(--border)}
+.nav svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.6}
+.tip{position:absolute;left:54px;background:var(--panel2);border:1px solid var(--border2);padding:5px 11px;border-radius:7px;font-size:.68rem;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .2s;color:var(--text);letter-spacing:.06em;z-index:100}
+.nav:hover .tip{opacity:1}
+.sb-bot{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:8px}
+.avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:700;cursor:pointer;border:2px solid var(--border2)}
+.topbar{position:fixed;top:0;left:var(--sb);right:0;height:var(--tb);background:rgba(3,7,15,.88);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 28px;gap:14px;z-index:50}
+.ptitle{font-family:var(--fh);font-size:1.35rem;font-weight:800;letter-spacing:.1em;color:#fff;margin-right:auto}
+.tbtn{padding:7px 16px;border-radius:8px;font-size:.76rem;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;font-family:var(--fm);transition:all .2s;display:flex;align-items:center;gap:7px;text-decoration:none}
+.tbtn:hover{border-color:var(--border2);background:rgba(56,189,248,.06);color:var(--accent)}
+.tbtn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent;color:#fff;font-weight:600}
+.content{margin-left:var(--sb);padding-top:var(--tb)}
+.page{padding:28px;max-width:760px;position:relative;z-index:1}
+.page-header{margin-bottom:28px}
+.page-title{font-family:var(--fh);font-size:2rem;font-weight:800;color:#fff;margin-bottom:6px}
+.page-sub{font-size:.82rem;color:var(--muted2)}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:24px;margin-bottom:20px;position:relative;overflow:hidden}
+.card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(56,189,248,.015),transparent 60%);pointer-events:none}
+.sl{font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:18px;display:flex;align-items:center;gap:8px}
+.sl::after{content:'';flex:1;height:1px;background:var(--border)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.fg{margin-bottom:16px;position:relative}
+.fg label{display:block;font-size:.65rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+.fg input{width:100%;padding:11px 14px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:9px;color:var(--text);font-family:var(--fm);font-size:.88rem;outline:none;transition:all .25s}
+.fg input:focus{border-color:rgba(56,189,248,.4);background:rgba(56,189,248,.04);box-shadow:0 0 0 3px rgba(56,189,248,.07)}
+.fg input::placeholder{color:var(--muted)}
+.fg input:disabled{opacity:.4;cursor:not-allowed}
+.save-btn{padding:11px 28px;border:none;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-family:var(--fh);font-size:.9rem;font-weight:700;cursor:pointer;letter-spacing:.06em;transition:all .25s;box-shadow:0 0 20px rgba(56,189,248,.15)}
+.save-btn:hover{opacity:.88;transform:translateY(-1px)}
+.save-btn.loading{opacity:.6;pointer-events:none}
+.danger-btn{padding:11px 28px;border:1px solid rgba(248,113,113,.3);border-radius:9px;background:rgba(248,113,113,.08);color:var(--danger);font-family:var(--fh);font-size:.9rem;font-weight:700;cursor:pointer;letter-spacing:.06em;transition:all .25s}
+.danger-btn:hover{background:rgba(248,113,113,.15);border-color:rgba(248,113,113,.5)}
+.alert{padding:10px 14px;border-radius:8px;font-size:.78rem;margin-bottom:14px;display:none}
+.alert.err{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);color:#fca5a5;display:block}
+.alert.ok{background:rgba(52,211,153,.07);border:1px solid rgba(52,211,153,.2);color:var(--green);display:block}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
+.toggle-row:last-child{border-bottom:none}
+.toggle-info{font-size:.84rem}
+.toggle-info span{display:block;font-size:.72rem;color:var(--muted);margin-top:3px}
+.toggle{position:relative;width:44px;height:24px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;background:rgba(255,255,255,.1);border-radius:12px;cursor:pointer;transition:all .3s;border:1px solid var(--border)}
+.toggle-slider::before{content:'';position:absolute;width:18px;height:18px;background:#fff;border-radius:50%;left:2px;top:2px;transition:.3s}
+.toggle input:checked+.toggle-slider{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent}
+.toggle input:checked+.toggle-slider::before{transform:translateX(20px)}
+.profile-preview{display:flex;align-items:center;gap:16px;padding:16px;background:rgba(56,189,248,.04);border:1px solid var(--border2);border-radius:12px;margin-bottom:20px}
+.pava{width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:1rem;font-weight:700}
+.pinfo .pname{font-size:.94rem;font-weight:600;margin-bottom:2px}
+.pinfo .pemail{font-size:.74rem;color:var(--muted)}
+@media(max-width:900px){.form-row{grid-template-columns:1fr}.sidebar{display:none}.content{margin-left:0}.topbar{left:0}}
+</style>
+</head>
+<body>
+<div class="bg-mesh"></div>
+<div class="bg-grid"></div>
+<nav class="sidebar">
+  <div class="sb-logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M8 12h1l1-3 2 6 2-8 1 5h1" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+  <a href="/dashboard" class="nav"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="tip">Dashboard</span></a>
+  <a href="/history" class="nav"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span class="tip">History</span></a>
+  <a href="/settings" class="nav on"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg><span class="tip">Settings</span></a>
+  <div class="sb-bot">
+    <a href="/logout" class="nav"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span class="tip">Sign Out</span></a>
+    <div class="avatar">{{ user.initials }}</div>
+  </div>
+</nav>
+<header class="topbar">
+  <span class="ptitle">SETTINGS</span>
+  <a href="/dashboard" class="tbtn primary">← Dashboard</a>
+</header>
+<div class="content">
+<div class="page">
+  <div class="page-header">
+    <div class="page-title">Account Settings</div>
+    <div class="page-sub">Manage your profile, security, and preferences</div>
+  </div>
+
+  <!-- Profile card -->
+  <div class="card">
+    <div class="sl">Profile</div>
+    <div class="profile-preview">
+      <div class="pava" id="avatarPreview">{{ user.initials }}</div>
+      <div class="pinfo"><div class="pname" id="namePreview">{{ user.name }}</div><div class="pemail">{{ user.email }}</div></div>
+    </div>
+    <div id="profileAlert"></div>
+    <div class="form-row">
+      <div class="fg"><label>Full Name</label><input type="text" id="nameInput" value="{{ user.name }}" placeholder="Your name" oninput="updatePreview()"></div>
+      <div class="fg"><label>Email Address</label><input type="email" id="emailInput" value="{{ user.email }}" disabled></div>
+    </div>
+    <button class="save-btn" onclick="saveProfile()">Save Profile</button>
+  </div>
+
+  <!-- Password -->
+  <div class="card">
+    <div class="sl">Change Password</div>
+    <div id="pwAlert"></div>
+    <div class="form-row">
+      <div class="fg"><label>Current Password</label><input type="password" id="oldPw" placeholder="••••••••"></div>
+      <div class="fg"><label>New Password</label><input type="password" id="newPw" placeholder="Min 6 characters"></div>
+    </div>
+    <div class="fg" style="max-width:50%"><label>Confirm New Password</label><input type="password" id="confPw" placeholder="••••••••"></div>
+    <button class="save-btn" onclick="changePassword()">Update Password</button>
+  </div>
+
+  <!-- Preferences -->
+  <div class="card">
+    <div class="sl">Preferences</div>
+    <div class="toggle-row">
+      <div class="toggle-info">Voice Alerts<span>Speak stress level changes aloud</span></div>
+      <label class="toggle"><input type="checkbox" id="voiceAlerts" checked><span class="toggle-slider"></span></label>
+    </div>
+    <div class="toggle-row">
+      <div class="toggle-info">Claude Vision AI<span>Use Claude Vision for face analysis (uses API credits)</span></div>
+      <label class="toggle"><input type="checkbox" id="claudeVision" checked><span class="toggle-slider"></span></label>
+    </div>
+    <div class="toggle-row">
+      <div class="toggle-info">Browser Notifications<span>Alert when stress stays high for 5+ minutes</span></div>
+      <label class="toggle"><input type="checkbox" id="browserNotif"><span class="toggle-slider"></span></label>
+    </div>
+    <div class="toggle-row">
+      <div class="toggle-info">Auto-save Sessions<span>Save every analysis session to history</span></div>
+      <label class="toggle"><input type="checkbox" id="autoSave" checked><span class="toggle-slider"></span></label>
+    </div>
+    <div style="margin-top:16px">
+      <button class="save-btn" onclick="savePrefs()">Save Preferences</button>
+    </div>
+  </div>
+
+  <!-- Danger zone -->
+  <div class="card" style="border-color:rgba(248,113,113,.2)">
+    <div class="sl" style="color:var(--danger)">Danger Zone</div>
+    <p style="font-size:.82rem;color:var(--muted2);margin-bottom:16px">These actions are permanent and cannot be undone.</p>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <button class="danger-btn" onclick="clearHistory()">Clear All History</button>
+      <button class="danger-btn" onclick="deleteAccount()">Delete Account</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+function updatePreview(){
+  const n=document.getElementById('nameInput').value.trim();
+  document.getElementById('namePreview').textContent=n||'—';
+  const parts=n.split(' ');
+  document.getElementById('avatarPreview').textContent=(parts[0]?.[0]||'')+(parts[1]?.[0]||'').toUpperCase();
+}
+function alert_(id,msg,type){const el=document.getElementById(id);el.className=`alert ${type}`;el.textContent=msg;setTimeout(()=>{el.className='alert';el.textContent=''},4000)}
+
+async function saveProfile(){
+  const name=document.getElementById('nameInput').value.trim();
+  if(!name){alert_('profileAlert','Name cannot be empty','err');return}
+  const btn=document.querySelector('.card:nth-child(2) .save-btn');btn.classList.add('loading');btn.textContent='Saving…';
+  const r=await fetch('/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'update_profile',name})});
+  const d=await r.json();
+  btn.classList.remove('loading');btn.textContent='Save Profile';
+  d.ok?alert_('profileAlert','✓ Profile updated','ok'):alert_('profileAlert',d.error,'err');
+}
+
+async function changePassword(){
+  const old=document.getElementById('oldPw').value,nw=document.getElementById('newPw').value,conf=document.getElementById('confPw').value;
+  if(!old||!nw){alert_('pwAlert','Please fill all password fields','err');return}
+  if(nw!==conf){alert_('pwAlert','New passwords do not match','err');return}
+  if(nw.length<6){alert_('pwAlert','New password must be at least 6 characters','err');return}
+  const r=await fetch('/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'change_password',old_password:old,new_password:nw})});
+  const d=await r.json();
+  if(d.ok){alert_('pwAlert','✓ Password updated successfully','ok');document.getElementById('oldPw').value='';document.getElementById('newPw').value='';document.getElementById('confPw').value=''}
+  else alert_('pwAlert',d.error,'err');
+}
+
+function savePrefs(){
+  const prefs={voiceAlerts:document.getElementById('voiceAlerts').checked,claudeVision:document.getElementById('claudeVision').checked,browserNotif:document.getElementById('browserNotif').checked,autoSave:document.getElementById('autoSave').checked};
+  localStorage.setItem('neuroscan_prefs',JSON.stringify(prefs));
+  // Ask for notification permission if enabled
+  if(prefs.browserNotif&&Notification.permission==='default') Notification.requestPermission();
+  const btn=document.querySelectorAll('.save-btn')[1];
+  const orig=btn.textContent;btn.textContent='✓ Saved!';setTimeout(()=>btn.textContent=orig,2000);
+}
+
+function clearHistory(){
+  if(confirm('Delete all your session history? This cannot be undone.')) alert('Feature coming soon — connect a /api/clear-history endpoint.');
+}
+function deleteAccount(){
+  if(confirm('Delete your account permanently? This cannot be undone.')) alert('Feature coming soon.');
+}
+
+// Load saved prefs
+const saved=JSON.parse(localStorage.getItem('neuroscan_prefs')||'{}');
+if('voiceAlerts' in saved) document.getElementById('voiceAlerts').checked=saved.voiceAlerts;
+if('claudeVision' in saved) document.getElementById('claudeVision').checked=saved.claudeVision;
+if('browserNotif' in saved) document.getElementById('browserNotif').checked=saved.browserNotif;
+if('autoSave' in saved) document.getElementById('autoSave').checked=saved.autoSave;
+</script>
+</body>
+</html>

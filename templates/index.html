@@ -1,26 +1,882 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Stress Detection AI</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeuroScan — Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#03060f;--panel:#080e1c;--panel2:#0c1627;
+  --border:rgba(0,200,255,0.1);--border2:rgba(0,200,255,0.2);
+  --accent:#00c8ff;--accent2:#7c3aed;--accent3:#00ffaa;
+  --warn:#f59e0b;--danger:#ff4d6d;--ok:#00ffaa;
+  --text:#e8edf5;--muted:#4a5568;--muted2:#64748b;
+  --ff-head:'Bebas Neue',sans-serif;
+  --ff-body:'Outfit',sans-serif;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--ff-body);min-height:100vh;overflow-x:hidden}
+
+/* BG */
+.bg-mesh{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(ellipse 800px 500px at 10% 20%,rgba(0,200,255,0.04),transparent),
+             radial-gradient(ellipse 600px 400px at 90% 80%,rgba(124,58,237,0.04),transparent)}
+
+/* SIDEBAR */
+.sidebar{
+  position:fixed;top:0;left:0;bottom:0;width:72px;
+  background:var(--panel);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;
+  padding:20px 0;z-index:50;gap:6px;
+}
+.sidebar-logo{
+  width:40px;height:40px;border-radius:10px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:28px;flex-shrink:0;
+}
+.nav-item{
+  width:44px;height:44px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--muted2);cursor:pointer;transition:all 0.2s;
+  position:relative;border:1px solid transparent;
+}
+.nav-item:hover{color:var(--accent);background:rgba(0,200,255,0.07);border-color:var(--border)}
+.nav-item.active{color:var(--accent);background:rgba(0,200,255,0.1);border-color:var(--border2)}
+.nav-item svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.5}
+.nav-tooltip{
+  position:absolute;left:56px;
+  background:var(--panel2);border:1px solid var(--border2);
+  padding:5px 10px;border-radius:6px;font-size:0.72rem;
+  white-space:nowrap;pointer-events:none;opacity:0;transition:opacity 0.2s;
+  letter-spacing:0.06em;color:var(--text);
+}
+.nav-item:hover .nav-tooltip{opacity:1}
+.sidebar-bottom{margin-top:auto}
+.avatar{
+  width:36px;height:36px;border-radius:50%;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  display:flex;align-items:center;justify-content:center;
+  font-size:0.8rem;font-weight:600;cursor:pointer;
+  border:2px solid var(--border2);
+}
+
+/* TOPBAR */
+.topbar{
+  position:fixed;top:0;left:72px;right:0;height:60px;
+  background:rgba(3,6,15,0.85);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 28px;gap:16px;z-index:40;
+}
+.page-title{font-family:var(--ff-head);font-size:1.5rem;letter-spacing:0.08em;color:white;margin-right:auto}
+.topbar-pill{
+  padding:5px 14px;border-radius:20px;font-size:0.72rem;
+  letter-spacing:0.1em;display:flex;align-items:center;gap:7px;
+  border:1px solid var(--border);color:var(--muted2);
+}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--danger);flex-shrink:0}
+.live-dot.active{background:var(--ok);animation:blink 1.4s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+.topbar-btn{
+  padding:7px 16px;border-radius:8px;font-size:0.8rem;
+  border:1px solid var(--border);background:transparent;
+  color:var(--text);cursor:pointer;font-family:var(--ff-body);
+  transition:all 0.2s;display:flex;align-items:center;gap:7px;
+}
+.topbar-btn:hover{border-color:var(--border2);background:rgba(0,200,255,0.06);color:var(--accent)}
+.topbar-btn.primary{
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  border-color:transparent;color:white;font-weight:500;
+  box-shadow:0 0 20px rgba(0,200,255,0.15);
+}
+.topbar-btn.primary:hover{opacity:0.88;transform:translateY(-1px)}
+.topbar-btn.primary.running{background:linear-gradient(135deg,#374151,#4b5563);box-shadow:none}
+
+/* CONTENT */
+.content{margin-left:72px;padding-top:60px}
+.grid{display:grid;grid-template-columns:340px 1fr 300px;gap:0;min-height:calc(100vh - 60px)}
+
+/* PANELS */
+.panel{padding:20px;border-right:1px solid var(--border)}
+.panel.last{border-right:none}
+.section-label{font-size:0.62rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* CARD */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:14px;position:relative;overflow:hidden;transition:border-color 0.25s}
+.card:hover{border-color:var(--border2)}
+.card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(0,200,255,0.015),transparent 60%);pointer-events:none}
+
+/* CAMERA */
+.cam-wrap{position:relative;border-radius:10px;overflow:hidden;background:#000;aspect-ratio:4/3;margin-bottom:14px}
+#video{width:100%;height:100%;object-fit:cover;display:block}
+.cam-off{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--muted);background:rgba(0,0,0,0.8)}
+.cam-off svg{width:40px;height:40px;stroke:currentColor;fill:none;stroke-width:1.2}
+.cam-off p{font-size:0.78rem}
+.cam-off.hidden{display:none}
+
+/* SCAN OVERLAY */
+.scan-overlay{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity 0.6s}
+.scan-overlay.on{opacity:1}
+.scan-line{position:absolute;left:0;right:0;height:1.5px;background:linear-gradient(90deg,transparent,var(--accent),transparent);box-shadow:0 0 10px var(--accent);animation:scanV 3s ease-in-out infinite}
+@keyframes scanV{0%,100%{top:5%;opacity:0}10%{opacity:1}90%{opacity:1}50%{top:92%}}
+.corner-tl,.corner-tr,.corner-bl,.corner-br{position:absolute;width:16px;height:16px;border-color:var(--accent);border-style:solid}
+.corner-tl{top:10px;left:10px;border-width:2px 0 0 2px;border-radius:2px 0 0 0}
+.corner-tr{top:10px;right:10px;border-width:2px 2px 0 0;border-radius:0 2px 0 0}
+.corner-bl{bottom:10px;left:10px;border-width:0 0 2px 2px;border-radius:0 0 0 2px}
+.corner-br{bottom:10px;right:10px;border-width:0 2px 2px 0;border-radius:0 0 2px 0}
+.face-tag{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);font-size:0.6rem;color:var(--accent);letter-spacing:0.16em;text-transform:uppercase;white-space:nowrap}
+.face-box{position:absolute;border:1px solid var(--accent);border-radius:3px;display:none;box-shadow:0 0 12px rgba(0,200,255,0.3)}
+
+/* RINGS */
+.rings-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.ring-item{display:flex;flex-direction:column;align-items:center;gap:7px}
+.ring-wrap{position:relative;width:76px;height:76px}
+.ring-wrap svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring-bg{fill:none;stroke:rgba(255,255,255,0.04);stroke-width:7}
+.ring-fill{fill:none;stroke-width:7;stroke-linecap:round;stroke-dasharray:210;stroke-dashoffset:210;transition:stroke-dashoffset 0.7s ease,stroke 0.4s}
+.r-a{stroke:var(--accent)}
+.r-b{stroke:var(--accent2)}
+.r-c{stroke:var(--warn)}
+.ring-val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.82rem;font-weight:500}
+.ring-name{font-size:0.6rem;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;text-align:center}
+
+/* STRESS METER */
+.meter-wrap{display:flex;flex-direction:column;align-items:center;padding:10px 0 4px}
+.meter-svg-wrap{width:240px;position:relative}
+.meter-svg-wrap svg{width:100%}
+.meter-ticks{display:flex;justify-content:space-between;padding:0 12px;margin-top:-4px}
+.meter-ticks span{font-size:0.6rem;color:var(--muted);letter-spacing:0.1em}
+.stress-num{
+  font-family:var(--ff-head);font-size:5rem;line-height:1;
+  letter-spacing:-0.02em;margin-top:8px;
+  background:linear-gradient(135deg,white,var(--accent));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  transition:all 0.5s ease;
+}
+.stress-lbl{font-size:0.85rem;letter-spacing:0.14em;color:var(--muted);text-transform:uppercase;margin-top:4px}
+.stress-trend{font-size:0.82rem;margin-top:4px;min-height:20px;letter-spacing:0.04em}
+
+/* EMOJI BAR */
+.mood-bar{display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding:10px 16px;border-radius:10px;background:rgba(255,255,255,0.02);border:1px solid var(--border)}
+.mood-item{font-size:1.4rem;cursor:pointer;transition:transform 0.2s,filter 0.2s;filter:grayscale(0.7) opacity(0.5)}
+.mood-item.active,.mood-item:hover{transform:scale(1.3);filter:none}
+
+/* CHART */
+#mainChart{max-height:160px}
+
+/* EEG WAVE */
+.eeg-wrap{height:60px;position:relative;overflow:hidden;margin-bottom:14px;border-radius:10px;background:rgba(0,200,255,0.02);border:1px solid var(--border)}
+#eegCanvas{width:100%;height:100%;display:block}
+
+/* RISK */
+.risk-badge{
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  padding:14px;border-radius:12px;margin-bottom:14px;
+  transition:all 0.4s;border:1px solid var(--border);
+}
+.risk-badge.ok{border-color:rgba(0,255,170,0.2);background:rgba(0,255,170,0.04)}
+.risk-badge.warn{border-color:rgba(245,158,11,0.2);background:rgba(245,158,11,0.04)}
+.risk-badge.high{border-color:rgba(255,77,109,0.25);background:rgba(255,77,109,0.05)}
+.risk-emoji{font-size:2.4rem}
+.risk-title{font-family:var(--ff-head);font-size:1.25rem;letter-spacing:0.06em;color:white;text-align:center}
+.risk-acc{font-size:0.7rem;color:var(--muted)}
+.risk-acc strong{color:var(--accent)}
+
+/* LIST ITEMS */
+.tag-list{display:flex;flex-direction:column;gap:7px}
+.tag-item{
+  padding:9px 12px;border-radius:8px;font-size:0.78rem;line-height:1.4;
+  border-left:3px solid;background:rgba(255,255,255,0.02);
+  animation:slideIn 0.35s ease;
+}
+@keyframes slideIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+.tag-item.reason{border-left-color:var(--warn)}
+.tag-item.suggest{border-left-color:var(--ok)}
+.tag-item.placeholder{border-left-color:var(--border)!important;color:var(--muted)!important;font-style:italic}
+
+/* STATS GRID */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat-box{padding:12px;border-radius:10px;background:rgba(255,255,255,0.02);border:1px solid var(--border)}
+.stat-n{font-family:var(--ff-head);font-size:1.6rem;color:white;letter-spacing:0.04em}
+.stat-l{font-size:0.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-top:2px}
+
+/* HEATMAP */
+.heatmap{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:8px}
+.hm-cell{aspect-ratio:1;border-radius:3px;cursor:pointer;transition:transform 0.15s}
+.hm-cell:hover{transform:scale(1.3)}
+
+/* BREATHING WIDGET */
+.breath-widget{
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+  padding:16px;border-radius:12px;border:1px solid var(--border);
+  background:rgba(0,200,255,0.02);
+}
+.breath-circle{
+  width:80px;height:80px;border-radius:50%;
+  border:2px solid rgba(0,200,255,0.3);
+  display:flex;align-items:center;justify-content:center;
+  font-size:0.75rem;color:var(--accent);letter-spacing:0.06em;
+  transition:transform 4s ease,border-color 4s ease,box-shadow 4s ease;
+  cursor:pointer;
+}
+.breath-circle.expand{
+  transform:scale(1.4);
+  border-color:rgba(0,200,255,0.8);
+  box-shadow:0 0 30px rgba(0,200,255,0.2);
+}
+.breath-label{font-size:0.72rem;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase}
+.breath-btn{
+  padding:7px 20px;border-radius:8px;
+  border:1px solid var(--border);background:transparent;
+  color:var(--text);font-family:var(--ff-body);font-size:0.78rem;
+  cursor:pointer;transition:all 0.2s;letter-spacing:0.06em;
+}
+.breath-btn:hover{border-color:var(--border2);color:var(--accent)}
+
+/* HISTORY CHART */
+.history-tabs{display:flex;gap:6px;margin-bottom:14px}
+.htab{padding:5px 12px;border-radius:6px;font-size:0.72rem;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:var(--ff-body);transition:all 0.2s;letter-spacing:0.06em}
+.htab.active{border-color:var(--border2);color:var(--accent);background:rgba(0,200,255,0.08)}
+
+/* SCROLL */
+.panel{overflow-y:auto;max-height:calc(100vh - 60px)}
+.panel::-webkit-scrollbar{width:3px}
+.panel::-webkit-scrollbar-track{background:transparent}
+.panel::-webkit-scrollbar-thumb{background:rgba(0,200,255,0.15);border-radius:2px}
+
+/* TOAST */
+.toast{
+  position:fixed;bottom:24px;right:24px;z-index:200;
+  background:var(--panel2);border:1px solid var(--border2);
+  padding:11px 20px;border-radius:10px;font-size:0.82rem;
+  backdrop-filter:blur(10px);
+  transform:translateY(80px);opacity:0;transition:all 0.4s cubic-bezier(.34,1.56,.64,1);
+}
+.toast.show{transform:none;opacity:1}
+
+/* STRESS COLORS */
+.c-low{color:var(--ok)!important;-webkit-text-fill-color:var(--ok)!important}
+.c-med{color:var(--warn)!important;-webkit-text-fill-color:var(--warn)!important}
+.c-hi{color:var(--danger)!important;-webkit-text-fill-color:var(--danger)!important}
+
+/* MOBILE */
+@media(max-width:1100px){
+  .grid{grid-template-columns:1fr 1fr}
+  .panel.last{display:none}
+}
+@media(max-width:720px){
+  .sidebar{display:none}
+  .content{margin-left:0}
+  .topbar{left:0}
+  .grid{grid-template-columns:1fr}
+}
+</style>
 </head>
-
 <body>
+<div class="bg-mesh"></div>
 
-<h1>🧠 Stress Detection AI</h1>
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+      <path d="M8 12h1l1-3 2 6 2-8 1 5h1" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
 
-<video id="video" autoplay></video>
+  <div class="nav-item active" title="">
+    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    <span class="nav-tooltip">Dashboard</span>
+  </div>
+  <div class="nav-item" title="">
+    <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    <span class="nav-tooltip">History</span>
+  </div>
+  <div class="nav-item" title="">
+    <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    <span class="nav-tooltip">Profile</span>
+  </div>
+  <div class="nav-item" title="">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+    <span class="nav-tooltip">Insights</span>
+  </div>
 
-<br><br>
+  <div class="sidebar-bottom">
+    <div class="nav-item" title="">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
+      <span class="nav-tooltip">Settings</span>
+    </div>
+    <div class="avatar" style="margin-top:12px">RS</div>
+  </div>
+</nav>
 
-<button id="startBtn">Start Analysis</button>
+<!-- TOPBAR -->
+<header class="topbar">
+  <span class="page-title">NEUROSCAN</span>
+  <div class="topbar-pill">
+    <div class="live-dot" id="liveDot"></div>
+    <span id="liveText">Idle</span>
+  </div>
+  <div class="topbar-pill" id="accPill" style="display:none">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+    <span id="accVal">—</span>
+  </div>
+  <button class="topbar-btn" id="exportBtn" onclick="exportData()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Export
+  </button>
+  <button class="topbar-btn primary" id="startBtn" onclick="toggleAnalysis()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="startIcon"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+    <span id="startLabel">Start Analysis</span>
+  </button>
+</header>
 
-<h2 id="output"></h2>
+<!-- CONTENT -->
+<div class="content">
+<div class="grid">
 
-<canvas id="chart" width="400" height="200"></canvas>
+  <!-- ── LEFT PANEL ── -->
+  <div class="panel">
+    <div class="section-label">Camera</div>
 
-<script src="/static/script.js"></script>
+    <div class="card" style="padding:14px">
+      <div class="cam-wrap">
+        <video id="video" autoplay playsinline muted></video>
+        <div class="scan-overlay" id="scanOverlay">
+          <div class="scan-line"></div>
+          <div class="corner-tl"></div><div class="corner-tr"></div>
+          <div class="corner-bl"></div><div class="corner-br"></div>
+          <div class="face-tag" id="faceTag">Scanning…</div>
+          <div class="face-box" id="faceBox"></div>
+        </div>
+        <div class="cam-off" id="camOff">
+          <svg viewBox="0 0 24 24"><path d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.361a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+          <p>Camera access needed</p>
+        </div>
+      </div>
 
+      <!-- EEG-style live wave -->
+      <div class="eeg-wrap"><canvas id="eegCanvas"></canvas></div>
+    </div>
+
+    <div class="section-label">Biometrics</div>
+    <div class="card">
+      <div class="rings-grid">
+        <div class="ring-item">
+          <div class="ring-wrap">
+            <svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="33" class="ring-bg"/><circle cx="40" cy="40" r="33" class="ring-fill r-a" id="rA"/></svg>
+            <div class="ring-val" id="rvA">--</div>
+          </div>
+          <div class="ring-name">Blink</div>
+        </div>
+        <div class="ring-item">
+          <div class="ring-wrap">
+            <svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="33" class="ring-bg"/><circle cx="40" cy="40" r="33" class="ring-fill r-b" id="rB"/></svg>
+            <div class="ring-val" id="rvB">--</div>
+          </div>
+          <div class="ring-name">Voice</div>
+        </div>
+        <div class="ring-item">
+          <div class="ring-wrap">
+            <svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="33" class="ring-bg"/><circle cx="40" cy="40" r="33" class="ring-fill r-c" id="rC"/></svg>
+            <div class="ring-val" id="rvC">--</div>
+          </div>
+          <div class="ring-name">Tension</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-label">Quick Tools</div>
+    <div class="breath-widget">
+      <div class="breath-circle" id="breathCircle" onclick="startBreathing()">BREATHE</div>
+      <div class="breath-label" id="breathLabel">Click to start exercise</div>
+      <button class="breath-btn" onclick="startBreathing()">4-7-8 Breathing</button>
+    </div>
+
+    <div class="section-label" style="margin-top:14px">Weekly Heatmap</div>
+    <div class="card">
+      <div style="font-size:0.65rem;color:var(--muted);margin-bottom:8px;letter-spacing:0.08em">MON — SUN (last 4 weeks)</div>
+      <div class="heatmap" id="heatmap"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+        <span style="font-size:0.65rem;color:var(--muted)">Low</span>
+        <div style="flex:1;height:5px;border-radius:3px;background:linear-gradient(to right,rgba(0,255,170,0.3),rgba(245,158,11,0.5),rgba(255,77,109,0.7))"></div>
+        <span style="font-size:0.65rem;color:var(--muted)">High</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CENTER PANEL ── -->
+  <div class="panel">
+    <div class="section-label">Stress Index</div>
+    <div class="card">
+      <div class="meter-wrap">
+        <div class="meter-svg-wrap">
+          <svg viewBox="0 0 240 130">
+            <defs>
+              <linearGradient id="arcG" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#00ffaa"/>
+                <stop offset="50%" stop-color="#f59e0b"/>
+                <stop offset="100%" stop-color="#ff4d6d"/>
+              </linearGradient>
+            </defs>
+            <path d="M24 122 A96 96 0 0 1 216 122" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="14" stroke-linecap="round"/>
+            <path d="M24 122 A96 96 0 0 1 216 122" fill="none" stroke="url(#arcG)" stroke-width="14" stroke-linecap="round"
+              stroke-dasharray="302" stroke-dashoffset="302" id="arcFill" style="transition:stroke-dashoffset 0.9s ease"/>
+            <line x1="120" y1="122" x2="120" y2="38" stroke="white" stroke-width="2.5" stroke-linecap="round"
+              id="needleLine" transform-origin="120 122" transform="rotate(-90)"/>
+            <circle cx="120" cy="122" r="6" fill="white"/>
+            <circle cx="120" cy="122" r="3" fill="var(--bg)"/>
+          </svg>
+        </div>
+        <div class="meter-ticks"><span>LOW</span><span>MED</span><span>HIGH</span></div>
+        <div class="stress-num" id="sNum">--</div>
+        <div class="stress-lbl" id="sLbl">Awaiting Data</div>
+        <div class="stress-trend" id="sTrend"></div>
+
+        <!-- Mood picker -->
+        <div class="mood-bar">
+          <div class="mood-item" onclick="setMood(this,'😴')">😴</div>
+          <div class="mood-item" onclick="setMood(this,'😊')">😊</div>
+          <div class="mood-item active" onclick="setMood(this,'😐')">😐</div>
+          <div class="mood-item" onclick="setMood(this,'😟')">😟</div>
+          <div class="mood-item" onclick="setMood(this,'😤')">😤</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-label">Live History</div>
+    <div class="history-tabs">
+      <button class="htab active" onclick="setChartRange(this,20)">Real-time</button>
+      <button class="htab" onclick="setChartRange(this,50)">Extended</button>
+    </div>
+    <div class="card">
+      <canvas id="mainChart"></canvas>
+    </div>
+
+    <div class="section-label">Session Stats</div>
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="stat-n" id="statTime">0:00</div>
+        <div class="stat-l">Duration</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-n" id="statCount">0</div>
+        <div class="stat-l">Readings</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-n" id="statAvg">--</div>
+        <div class="stat-l">Avg Stress</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-n" id="statPeak">--</div>
+        <div class="stat-l">Peak</div>
+      </div>
+    </div>
+
+    <!-- Mini bar chart of last 10 readings -->
+    <div class="section-label" style="margin-top:14px">Last 10 Readings</div>
+    <div class="card">
+      <canvas id="barChart" style="max-height:120px"></canvas>
+    </div>
+  </div>
+
+  <!-- ── RIGHT PANEL ── -->
+  <div class="panel last">
+    <div class="section-label">Risk Level</div>
+    <div class="risk-badge" id="riskBadge">
+      <div class="risk-emoji" id="riskEmoji">🟢</div>
+      <div class="risk-title" id="riskTitle">No Risk</div>
+      <div class="risk-acc">Accuracy: <strong id="accText">--</strong></div>
+    </div>
+
+    <div class="section-label">Signals Detected</div>
+    <div class="card">
+      <ul class="tag-list" id="reasonsList">
+        <li class="tag-item placeholder">Analysis not running</li>
+      </ul>
+    </div>
+
+    <div class="section-label">Recommendations</div>
+    <div class="card">
+      <ul class="tag-list" id="suggList">
+        <li class="tag-item placeholder">Start analysis to get advice</li>
+      </ul>
+    </div>
+
+    <div class="section-label">Stress Distribution</div>
+    <div class="card">
+      <canvas id="donutChart" style="max-height:160px"></canvas>
+    </div>
+
+    <div class="section-label" style="margin-top:4px">Profile</div>
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+        <div style="width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-weight:600;font-size:0.85rem">RS</div>
+        <div>
+          <div style="font-size:0.88rem;font-weight:500">Ravi Sharma</div>
+          <div style="font-size:0.72rem;color:var(--muted)">Free Plan</div>
+        </div>
+        <a href="/login" style="margin-left:auto;font-size:0.72rem;color:var(--muted);text-decoration:none;border:1px solid var(--border);padding:4px 10px;border-radius:6px;transition:all 0.2s" onmouseover="this.style.borderColor='rgba(0,200,255,0.3)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">Switch</a>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;justify-content:space-between;font-size:0.75rem">
+          <span style="color:var(--muted)">Sessions this week</span>
+          <span>7</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.75rem">
+          <span style="color:var(--muted)">Avg baseline stress</span>
+          <span id="baselineVal">--</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.75rem">
+          <span style="color:var(--muted)">Streak</span>
+          <span>🔥 5 days</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /grid -->
+</div><!-- /content -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── GLOBALS ───────────────────────────────────────
+let started=false, streamReady=false;
+let lastStress=null, lastSpoken='', readings=[], peak=0, sum=0;
+let sessionStart=null, timerInt=null;
+let chartRange=20;
+
+// ─── CAMERA ───────────────────────────────────────
+const video = document.getElementById('video');
+navigator.mediaDevices.getUserMedia({video:true,audio:false}).then(s=>{
+  video.srcObject=s; streamReady=true;
+  document.getElementById('camOff').classList.add('hidden');
+  toast('📷 Camera connected');
+}).catch(()=>toast('❌ Camera access denied'));
+
+function captureImage(){
+  if(!streamReady) return null;
+  const c=document.createElement('canvas');
+  c.width=video.videoWidth||640; c.height=video.videoHeight||480;
+  c.getContext('2d').drawImage(video,0,0,c.width,c.height);
+  return c.toDataURL('image/jpeg',0.75);
+}
+
+// ─── EEG WAVE ──────────────────────────────────────
+const eegCanvas=document.getElementById('eegCanvas');
+const eegCtx=eegCanvas.getContext('2d');
+let eegData=new Array(200).fill(30);
+let eegAmplitude=4;
+
+function resizeEEG(){eegCanvas.width=eegCanvas.offsetWidth;eegCanvas.height=eegCanvas.offsetHeight}
+resizeEEG(); window.addEventListener('resize',resizeEEG);
+
+function drawEEG(){
+  const W=eegCanvas.width,H=eegCanvas.height;
+  eegCtx.clearRect(0,0,W,H);
+  // shift + add new point
+  eegData.shift();
+  const noise=(Math.random()-0.5)*eegAmplitude*2;
+  const sine=Math.sin(Date.now()/300)*eegAmplitude;
+  eegData.push(H/2+sine+noise);
+  // draw
+  eegCtx.beginPath();
+  eegCtx.strokeStyle=`rgba(0,200,255,0.7)`;
+  eegCtx.lineWidth=1.5;
+  eegCtx.shadowColor='rgba(0,200,255,0.4)';
+  eegCtx.shadowBlur=4;
+  for(let i=0;i<eegData.length;i++){
+    const x=i*(W/eegData.length),y=eegData[i];
+    i===0?eegCtx.moveTo(x,y):eegCtx.lineTo(x,y);
+  }
+  eegCtx.stroke();
+  requestAnimationFrame(drawEEG);
+}
+drawEEG();
+
+// ─── CHARTS ────────────────────────────────────────
+const mainCtx=document.getElementById('mainChart').getContext('2d');
+const histData=[], histLabels=[];
+const mainChart=new Chart(mainCtx,{
+  type:'line',
+  data:{labels:histLabels,datasets:[{
+    data:histData,borderColor:'rgba(0,200,255,0.85)',
+    backgroundColor:'rgba(0,200,255,0.05)',borderWidth:2,
+    fill:true,tension:0.4,pointRadius:2,pointBackgroundColor:'#00c8ff'
+  }]},
+  options:{
+    animation:{duration:400},responsive:true,
+    scales:{
+      y:{min:0,max:100,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#4a5568',font:{size:10}}},
+      x:{grid:{display:false},ticks:{display:false}}
+    },
+    plugins:{legend:{display:false},tooltip:{backgroundColor:'#080e1c',borderColor:'rgba(0,200,255,0.3)',borderWidth:1,titleColor:'#4a5568',bodyColor:'#e8edf5',callbacks:{label:c=>` ${c.parsed.y}%`}}}
+  }
+});
+
+const barCtx=document.getElementById('barChart').getContext('2d');
+const barData=new Array(10).fill(0), barLabels=new Array(10).fill('');
+const barChart=new Chart(barCtx,{
+  type:'bar',
+  data:{labels:barLabels,datasets:[{data:barData,backgroundColor:barData.map(v=>colorFor(v)),borderRadius:4}]},
+  options:{
+    animation:{duration:300},responsive:true,
+    scales:{y:{min:0,max:100,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#4a5568',font:{size:10}}},x:{grid:{display:false},ticks:{display:false}}},
+    plugins:{legend:{display:false}}
+  }
+});
+
+const donutCtx=document.getElementById('donutChart').getContext('2d');
+const donutChart=new Chart(donutCtx,{
+  type:'doughnut',
+  data:{labels:['Low','Moderate','High'],datasets:[{data:[33,33,34],backgroundColor:['rgba(0,255,170,0.6)','rgba(245,158,11,0.6)','rgba(255,77,109,0.6)'],borderColor:'transparent',borderWidth:0}]},
+  options:{
+    animation:{duration:600},responsive:true,cutout:'72%',
+    plugins:{legend:{display:false},tooltip:{backgroundColor:'#080e1c',borderColor:'rgba(0,200,255,0.3)',borderWidth:1,bodyColor:'#e8edf5'}}
+  }
+});
+
+function colorFor(v){
+  if(v<30) return 'rgba(0,255,170,0.7)';
+  if(v<60) return 'rgba(245,158,11,0.7)';
+  return 'rgba(255,77,109,0.7)';
+}
+
+// ─── HEATMAP ───────────────────────────────────────
+(function buildHeatmap(){
+  const hm=document.getElementById('heatmap');
+  for(let i=0;i<28;i++){
+    const v=Math.random();
+    const div=document.createElement('div');
+    div.className='hm-cell';
+    const r=Math.round(v*255),g=0,b=0;
+    if(v<0.33) div.style.background=`rgba(0,255,170,${0.15+v*0.6})`;
+    else if(v<0.66) div.style.background=`rgba(245,158,11,${0.2+v*0.5})`;
+    else div.style.background=`rgba(255,77,109,${0.2+v*0.6})`;
+    div.title=`Stress: ${Math.round(v*100)}%`;
+    hm.appendChild(div);
+  }
+})();
+
+// ─── RING HELPER ───────────────────────────────────
+function setRing(arc,val){
+  const pct=Math.min(100,Math.max(0,val));
+  arc.style.strokeDashoffset=210-(pct/100)*210;
+  if(val>70) arc.style.stroke='var(--danger)';
+  else if(val>45) arc.style.stroke='var(--warn)';
+  else arc.style.stroke='';
+}
+
+// ─── METER ─────────────────────────────────────────
+function setMeter(pct){
+  document.getElementById('arcFill').style.strokeDashoffset=302-(pct/100)*302;
+  const angle=-90+(pct/100)*180;
+  document.getElementById('needleLine').setAttribute('transform',`rotate(${angle},120,122)`);
+}
+
+// ─── FAKE SENSORS ──────────────────────────────────
+function getBlink(){return Math.random()*100}
+function getVoice(){return Math.random()*100}
+
+// ─── SPEECH ────────────────────────────────────────
+function speak(text){
+  window.speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);
+  u.rate=0.95;u.pitch=1.05;window.speechSynthesis.speak(u);
+}
+
+// ─── TOGGLE ────────────────────────────────────────
+function toggleAnalysis(){
+  if(!started) startAnalysis(); else stopAnalysis();
+}
+
+function startAnalysis(){
+  started=true;
+  sessionStart=Date.now();
+  document.getElementById('startLabel').textContent='Stop Analysis';
+  document.getElementById('startBtn').classList.add('running');
+  document.getElementById('liveDot').classList.add('active');
+  document.getElementById('liveText').textContent='Live';
+  document.getElementById('scanOverlay').classList.add('on');
+  document.getElementById('accPill').style.display='flex';
+  eegAmplitude=12;
+  timerInt=setInterval(updateTimer,1000);
+  toast('🧠 Analysis started');
+  runLoop();
+}
+
+function stopAnalysis(){
+  started=false;
+  document.getElementById('startLabel').textContent='Start Analysis';
+  document.getElementById('startBtn').classList.remove('running');
+  document.getElementById('liveDot').classList.remove('active');
+  document.getElementById('liveText').textContent='Idle';
+  document.getElementById('scanOverlay').classList.remove('on');
+  eegAmplitude=4;
+  clearInterval(timerInt);
+  toast('⏹ Analysis stopped');
+}
+
+// ─── MAIN LOOP ─────────────────────────────────────
+function runLoop(){
+  if(!started) return;
+  const img=captureImage();
+  const blink=getBlink(), voice=getVoice();
+
+  // Instant rings
+  setRing(document.getElementById('rA'),blink);
+  setRing(document.getElementById('rB'),voice);
+  document.getElementById('rvA').textContent=Math.round(blink);
+  document.getElementById('rvB').textContent=Math.round(voice);
+
+  fetch('/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:img,blink,voice})})
+  .then(r=>r.json())
+  .then(data=>{
+    if(data.error){toast('⚠️ Backend error');return}
+    const s=data.stress;
+    readings.push(s); sum+=s; if(s>peak)peak=s;
+
+    // Face ring from components
+    const faceScore=data.components?.face||50;
+    setRing(document.getElementById('rC'),faceScore);
+    document.getElementById('rvC').textContent=Math.round(faceScore);
+
+    // EEG amplitude
+    eegAmplitude=4+s*0.2;
+
+    // Meter + number
+    setMeter(s);
+    const numEl=document.getElementById('sNum');
+    numEl.textContent=Math.round(s)+'%';
+    numEl.className='stress-num '+(s<30?'c-low':s<60?'c-med':'c-hi');
+    document.getElementById('sLbl').textContent=data.level;
+
+    // Trend
+    let trend='';
+    if(lastStress!==null) trend=s>lastStress?'📈 Increasing':'📉 Decreasing';
+    document.getElementById('sTrend').textContent=trend;
+    lastStress=s;
+
+    // Risk
+    const badge=document.getElementById('riskBadge');
+    badge.className='risk-badge '+(s<30?'ok':s<60?'warn':'high');
+    document.getElementById('riskEmoji').textContent=s<30?'🟢':s<60?'🟡':'🔴';
+    document.getElementById('riskTitle').textContent=data.risk;
+    document.getElementById('accText').textContent=data.accuracy;
+    document.getElementById('accVal').textContent=data.accuracy;
+
+    // Reasons
+    document.getElementById('reasonsList').innerHTML=data.reasons.map(r=>`<li class="tag-item reason">⚡ ${r}</li>`).join('');
+    document.getElementById('suggList').innerHTML=data.suggestions.map(sg=>`<li class="tag-item suggest">💡 ${sg}</li>`).join('');
+
+    // Face box fake positioning
+    const fb=document.getElementById('faceBox');
+    fb.style.display='block';
+    fb.style.cssText=`display:block;left:28%;top:15%;width:44%;height:68%;position:absolute;border:1px solid rgba(0,200,255,0.5);border-radius:3px;box-shadow:0 0 12px rgba(0,200,255,0.2)`;
+    document.getElementById('faceTag').textContent=s<30?'Calm Detected':s<60?'Mild Tension':'High Tension';
+
+    // Charts
+    histData.push(Math.round(s)); histLabels.push('');
+    if(histData.length>chartRange){histData.shift();histLabels.shift()}
+    mainChart.update();
+
+    // Bar chart
+    barData.shift(); barData.push(Math.round(s));
+    barChart.data.datasets[0].backgroundColor=barData.map(v=>colorFor(v));
+    barChart.update();
+
+    // Donut
+    const lo=readings.filter(v=>v<30).length;
+    const me=readings.filter(v=>v>=30&&v<60).length;
+    const hi=readings.filter(v=>v>=60).length;
+    const tot=readings.length||1;
+    donutChart.data.datasets[0].data=[lo/tot*100,me/tot*100,hi/tot*100];
+    donutChart.update();
+
+    // Stats
+    document.getElementById('statCount').textContent=readings.length;
+    document.getElementById('statAvg').textContent=Math.round(sum/readings.length)+'%';
+    document.getElementById('statPeak').textContent=Math.round(peak)+'%';
+    document.getElementById('baselineVal').textContent=Math.round(sum/readings.length)+'%';
+
+    // Voice
+    if(data.level!==lastSpoken){
+      if(s>70) speak('High stress detected. Please take a break.');
+      else if(s>40) speak('Moderate stress detected.');
+      else speak('You are calm. Keep it up.');
+      lastSpoken=data.level;
+    }
+  })
+  .catch(()=>toast('❌ Backend not responding'));
+
+  setTimeout(runLoop, started?2000:0);
+}
+
+// ─── TIMER ─────────────────────────────────────────
+function updateTimer(){
+  const e=Math.floor((Date.now()-sessionStart)/1000);
+  document.getElementById('statTime').textContent=`${Math.floor(e/60)}:${(e%60).toString().padStart(2,'0')}`;
+}
+
+// ─── BREATHING ─────────────────────────────────────
+let breathRunning=false;
+function startBreathing(){
+  if(breathRunning) return;
+  breathRunning=true;
+  const circle=document.getElementById('breathCircle');
+  const label=document.getElementById('breathLabel');
+  let phase=0;
+  const phases=[{text:'Inhale',dur:4000,expand:true},{text:'Hold',dur:7000,expand:true},{text:'Exhale',dur:8000,expand:false}];
+  function nextPhase(){
+    const p=phases[phase%phases.length];
+    label.textContent=`${p.text} (${p.dur/1000}s)`;
+    circle.textContent=p.text.toUpperCase();
+    if(p.expand) circle.classList.add('expand');
+    else circle.classList.remove('expand');
+    phase++;
+    if(phase>=phases.length*3){breathRunning=false;circle.textContent='DONE';label.textContent='Exercise complete';return}
+    setTimeout(nextPhase,p.dur);
+  }
+  nextPhase();
+}
+
+// ─── CHART RANGE ───────────────────────────────────
+function setChartRange(el,n){
+  document.querySelectorAll('.htab').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  chartRange=n;
+}
+
+// ─── MOOD ──────────────────────────────────────────
+function setMood(el,emoji){
+  document.querySelectorAll('.mood-item').forEach(m=>m.classList.remove('active'));
+  el.classList.add('active');
+  toast(`Mood logged: ${emoji}`);
+}
+
+// ─── EXPORT ────────────────────────────────────────
+function exportData(){
+  if(!readings.length){toast('No data to export');return}
+  const rows=[['Reading','Stress %'],...readings.map((v,i)=>[i+1,v])];
+  const csv=rows.map(r=>r.join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download='neuroscan_session.csv';a.click();
+  toast('✓ Data exported');
+}
+
+// ─── TOAST ─────────────────────────────────────────
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer=setTimeout(()=>t.classList.remove('show'),3000);
+}
+</script>
 </body>
 </html>

@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeuroScan — Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#03070f;--panel:#080f1e;--panel2:#0d1828;--panel3:#111e35;
+  --border:rgba(56,189,248,.1);--border2:rgba(56,189,248,.22);
+  --accent:#38bdf8;--accent2:#6366f1;--green:#34d399;
+  --warn:#fbbf24;--danger:#f87171;--purple:#a78bfa;--pink:#f472b6;
+  --text:#e2e8f0;--muted:#475569;--muted2:#64748b;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;
+  --sb:68px;--tb:62px;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--fm);min-height:100vh;overflow-x:hidden}
+.bg-mesh{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(ellipse 1000px 700px at 0% 0%,rgba(56,189,248,.03),transparent),
+             radial-gradient(ellipse 800px 600px at 100% 100%,rgba(99,102,241,.04),transparent),
+             radial-gradient(ellipse 500px 500px at 50% 50%,rgba(52,211,153,.015),transparent)}
+.bg-grid{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(rgba(56,189,248,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(56,189,248,.02) 1px,transparent 1px);
+  background-size:52px 52px}
+
+/* ── SIDEBAR ── */
+.sidebar{position:fixed;top:0;left:0;bottom:0;width:var(--sb);background:rgba(8,15,30,.97);backdrop-filter:blur(16px);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:16px 0;z-index:60}
+.sb-logo{width:42px;height:42px;border-radius:12px;margin-bottom:28px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;box-shadow:0 0 24px rgba(56,189,248,.3)}
+.nav{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer;transition:all .2s;position:relative;margin-bottom:4px;border:1px solid transparent;text-decoration:none}
+.nav:hover,.nav.on{color:var(--accent);background:rgba(56,189,248,.08);border-color:var(--border)}
+.nav svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.6}
+.tip{position:absolute;left:56px;background:var(--panel2);border:1px solid var(--border2);padding:5px 12px;border-radius:7px;font-size:.68rem;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .2s;color:var(--text);letter-spacing:.06em;z-index:100}
+.nav:hover .tip{opacity:1}
+.sb-bot{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:8px}
+.avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:700;cursor:pointer;border:2px solid var(--border2)}
+
+/* ── TOPBAR ── */
+.topbar{position:fixed;top:0;left:var(--sb);right:0;height:var(--tb);background:rgba(3,7,15,.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:12px;z-index:50}
+.ptitle{font-family:var(--fh);font-size:1.35rem;font-weight:800;letter-spacing:.1em;color:#fff;margin-right:auto}
+.pill{padding:5px 12px;border-radius:20px;font-size:.67rem;letter-spacing:.1em;display:flex;align-items:center;gap:7px;border:1px solid var(--border);color:var(--muted2)}
+.ldot{width:7px;height:7px;border-radius:50%;background:var(--danger);flex-shrink:0;transition:background .4s}
+.ldot.on{background:var(--green);animation:lb 1.4s ease-in-out infinite}
+@keyframes lb{0%,100%{opacity:1}50%{opacity:.3}}
+.tbtn{padding:7px 14px;border-radius:8px;font-size:.74rem;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;font-family:var(--fm);transition:all .2s;display:flex;align-items:center;gap:6px;text-decoration:none;white-space:nowrap}
+.tbtn:hover{border-color:var(--border2);background:rgba(56,189,248,.06);color:var(--accent)}
+.tbtn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent;color:#fff;font-weight:600;box-shadow:0 0 22px rgba(56,189,248,.2)}
+.tbtn.primary:hover{opacity:.88;transform:translateY(-1px)}
+.tbtn.primary.running{background:linear-gradient(135deg,#dc2626,#991b1b);box-shadow:0 0 16px rgba(248,113,113,.2)}
+
+/* ── LAYOUT ── */
+.content{margin-left:var(--sb);padding-top:var(--tb)}
+.grid{display:grid;grid-template-columns:300px 1fr 270px;min-height:calc(100vh - var(--tb))}
+.panel{padding:16px;border-right:1px solid var(--border);overflow-y:auto;max-height:calc(100vh - var(--tb))}
+.panel.last{border-right:none}
+.panel::-webkit-scrollbar{width:3px}
+.panel::-webkit-scrollbar-thumb{background:rgba(56,189,248,.15);border-radius:2px}
+
+/* ── SECTION LABEL ── */
+.sl{font-size:.57rem;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-bottom:11px;display:flex;align-items:center;gap:8px}
+.sl::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* ── CARD ── */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px;position:relative;overflow:hidden;transition:border-color .3s}
+.card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(56,189,248,.012),transparent 60%);pointer-events:none}
+.card:hover{border-color:var(--border2)}
+
+/* ── CAMERA ── */
+.cam-wrap{position:relative;border-radius:10px;overflow:hidden;background:#000;aspect-ratio:4/3;margin-bottom:10px}
+#video{width:100%;height:100%;object-fit:cover;display:block}
+.cam-off{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--muted);background:rgba(0,0,0,.88)}
+.cam-off svg{width:36px;height:36px;stroke:currentColor;fill:none;stroke-width:1.2}
+.cam-off p{font-size:.76rem}
+.cam-off.hidden{display:none}
+.scan-ov{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .6s}
+.scan-ov.on{opacity:1}
+.scan-line{position:absolute;left:0;right:0;height:1.5px;background:linear-gradient(90deg,transparent,var(--accent),transparent);box-shadow:0 0 10px var(--accent);animation:sv 2.8s ease-in-out infinite}
+@keyframes sv{0%,100%{top:5%;opacity:0}12%{opacity:1}88%{opacity:1}50%{top:92%}}
+.c-tl,.c-tr,.c-bl,.c-br{position:absolute;width:15px;height:15px;border-color:var(--accent);border-style:solid}
+.c-tl{top:10px;left:10px;border-width:2px 0 0 2px}
+.c-tr{top:10px;right:10px;border-width:2px 2px 0 0}
+.c-bl{bottom:10px;left:10px;border-width:0 0 2px 2px}
+.c-br{bottom:10px;right:10px;border-width:0 2px 2px 0}
+.face-tag{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);font-size:.58rem;color:var(--accent);letter-spacing:.16em;text-transform:uppercase;white-space:nowrap;background:rgba(3,7,15,.7);padding:3px 10px;border-radius:4px}
+.lm-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+
+/* ── SENSOR BADGES ── */
+.sensor-row{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.sbadge{padding:3px 9px;border-radius:5px;font-size:.6rem;letter-spacing:.08em;border:1px solid;display:flex;align-items:center;gap:4px}
+.sbadge.ok{border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.07);color:var(--green)}
+.sbadge.warn{border-color:rgba(251,191,36,.35);background:rgba(251,191,36,.07);color:var(--warn)}
+.sbadge.off{border-color:var(--border);background:transparent;color:var(--muted)}
+.sdot{width:5px;height:5px;border-radius:50%;background:currentColor}
+
+/* ── EEG ── */
+.eeg{height:52px;border-radius:10px;background:rgba(56,189,248,.02);border:1px solid var(--border);overflow:hidden;margin-bottom:10px}
+#eegCanvas{width:100%;height:100%;display:block}
+
+/* ── EMOTION ROW ── */
+.bottom-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.emot{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:.66rem;letter-spacing:.07em;background:rgba(56,189,248,.08);border:1px solid var(--border2);color:var(--accent)}
+.hr-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:.66rem;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);color:var(--danger)}
+.hrv-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:.66rem;background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.25);color:var(--purple)}
+
+/* ── RINGS ── */
+.rings{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.ri{display:flex;flex-direction:column;align-items:center;gap:5px}
+.rw{position:relative;width:70px;height:70px}
+.rw svg{width:100%;height:100%;transform:rotate(-90deg)}
+.rbg{fill:none;stroke:rgba(255,255,255,.04);stroke-width:7}
+.rfill{fill:none;stroke-width:7;stroke-linecap:round;stroke-dasharray:207;stroke-dashoffset:207;transition:stroke-dashoffset .7s ease,stroke .4s}
+.ra{stroke:var(--accent)}.rb{stroke:var(--accent2)}.rc{stroke:var(--warn)}
+.rv{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.76rem;font-weight:500}
+.rn{font-size:.57rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;text-align:center}
+
+/* ── METRIC MINI CARDS ── */
+.mini-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.mini{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:3px}
+.mini-label{font-size:.57rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+.mini-val{font-family:var(--fh);font-size:1.3rem;font-weight:700;color:#fff;letter-spacing:.02em}
+.mini-bar{height:3px;border-radius:2px;background:rgba(255,255,255,.06);margin-top:5px;overflow:hidden}
+.mini-fill{height:100%;border-radius:2px;transition:width .7s ease,background .4s}
+
+/* ── STRESS METER ── */
+.meter-wrap{display:flex;flex-direction:column;align-items:center;padding:6px 0}
+.msw{width:210px;position:relative}
+.msw svg{width:100%}
+.mticks{display:flex;justify-content:space-between;padding:0 8px;margin-top:-6px}
+.mticks span{font-size:.57rem;color:var(--muted);letter-spacing:.1em}
+.snum{font-family:var(--fh);font-size:4.8rem;font-weight:800;line-height:1;letter-spacing:-.02em;margin-top:6px;transition:all .5s}
+.slbl{font-size:.78rem;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;margin-top:4px}
+.strend{font-size:.76rem;margin-top:3px;min-height:18px;letter-spacing:.04em}
+.mood{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:9px 12px;border-radius:10px;background:rgba(255,255,255,.02);border:1px solid var(--border)}
+.mi{font-size:1.25rem;cursor:pointer;transition:transform .2s,filter .2s;filter:grayscale(.7) opacity(.45)}
+.mi:hover,.mi.on{transform:scale(1.28);filter:none}
+
+/* ── MULTI-METRIC CHART TABS ── */
+.chart-tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.ctab{padding:4px 11px;border-radius:6px;font-size:.66rem;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:var(--fm);transition:all .2s;letter-spacing:.06em}
+.ctab.on{border-color:var(--border2);color:var(--accent);background:rgba(56,189,248,.08)}
+.ctab.focus-tab.on{color:var(--green);border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.06)}
+.ctab.fatigue-tab.on{color:var(--warn);border-color:rgba(251,191,36,.3);background:rgba(251,191,36,.06)}
+.ctab.anxiety-tab.on{color:var(--purple);border-color:rgba(167,139,250,.3);background:rgba(167,139,250,.06)}
+.ctab.multi-tab.on{color:var(--pink);border-color:rgba(244,114,182,.3);background:rgba(244,114,182,.06)}
+
+/* ── STATS ── */
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sbox{padding:11px;border-radius:10px;background:rgba(255,255,255,.02);border:1px solid var(--border)}
+.sv{font-family:var(--fh);font-size:1.45rem;font-weight:700;color:#fff;letter-spacing:.04em}
+.slb{font-size:.57rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-top:3px}
+
+/* ── AI INSIGHTS ── */
+.ai-insights{background:var(--panel2);border:1px solid rgba(167,139,250,.2);border-radius:12px;padding:14px;margin-bottom:12px}
+.ai-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:.7rem;color:var(--purple);letter-spacing:.1em;text-transform:uppercase}
+.ai-dot{width:6px;height:6px;border-radius:50%;background:var(--purple);animation:lb 2s ease-in-out infinite}
+.ai-text{font-size:.78rem;line-height:1.65;color:var(--muted2)}
+.ai-text strong{color:var(--text)}
+
+/* ── RISK ── */
+.risk{display:flex;flex-direction:column;align-items:center;gap:7px;padding:14px;border-radius:12px;margin-bottom:12px;transition:all .4s;border:1px solid var(--border)}
+.risk.ok{border-color:rgba(52,211,153,.22);background:rgba(52,211,153,.04)}
+.risk.warn{border-color:rgba(251,191,36,.22);background:rgba(251,191,36,.04)}
+.risk.hi{border-color:rgba(248,113,113,.25);background:rgba(248,113,113,.05)}
+.risk-emoji{font-size:2rem}
+.risk-title{font-family:var(--fh);font-size:1.1rem;font-weight:700;letter-spacing:.06em;color:#fff;text-align:center}
+.risk-acc{font-size:.67rem;color:var(--muted)}
+.risk-acc strong{color:var(--accent)}
+
+/* ── TAG LISTS ── */
+.taglist{display:flex;flex-direction:column;gap:6px}
+.tag{padding:8px 11px;border-radius:8px;font-size:.73rem;line-height:1.4;border-left:3px solid;background:rgba(255,255,255,.02);animation:si .35s ease}
+@keyframes si{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+.tag.reason{border-left-color:var(--warn)}
+.tag.suggest{border-left-color:var(--green)}
+.tag.ph{border-left-color:var(--border)!important;color:var(--muted)!important;font-style:italic}
+
+/* ── HEATMAP ── */
+.heatmap{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:6px}
+.hm{aspect-ratio:1;border-radius:3px;cursor:pointer;transition:transform .15s}
+.hm:hover{transform:scale(1.3)}
+
+/* ── BREATHING ── */
+.breath{display:flex;flex-direction:column;align-items:center;gap:9px;padding:14px;border-radius:12px;border:1px solid var(--border);background:rgba(56,189,248,.02)}
+.bc{width:74px;height:74px;border-radius:50%;border:2px solid rgba(56,189,248,.3);display:flex;align-items:center;justify-content:center;font-size:.68rem;color:var(--accent);letter-spacing:.06em;font-family:var(--fh);font-weight:700;transition:transform 4s ease,border-color 4s ease,box-shadow 4s ease;cursor:pointer}
+.bc.exp{transform:scale(1.38);border-color:rgba(56,189,248,.85);box-shadow:0 0 32px rgba(56,189,248,.2)}
+.bl{font-size:.67rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase}
+.bbtn{padding:7px 18px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);font-family:var(--fm);font-size:.74rem;cursor:pointer;transition:all .2s;letter-spacing:.06em}
+.bbtn:hover{border-color:var(--border2);color:var(--accent)}
+
+/* ── PROFILE ── */
+.prow{display:flex;align-items:center;gap:11px;margin-bottom:12px}
+.pava{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.82rem}
+.pname{font-size:.85rem;font-weight:500}
+.pplan{font-size:.68rem;color:var(--muted)}
+.pswitch{margin-left:auto;font-size:.67rem;color:var(--muted);text-decoration:none;border:1px solid var(--border);padding:4px 10px;border-radius:6px;transition:all .2s}
+.pswitch:hover{border-color:var(--border2);color:var(--accent)}
+.pstat{display:flex;justify-content:space-between;font-size:.7rem;margin-bottom:5px}
+.pstat span:first-child{color:var(--muted)}
+
+/* ── NOTIF BAR ── */
+.notif-bar{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);border-radius:10px;padding:9px 14px;margin-bottom:12px;font-size:.76rem;color:#fca5a5;display:none;align-items:center;gap:9px}
+.notif-bar.show{display:flex}
+
+/* ── COLOR CLASSES ── */
+.c-low{color:var(--green)!important;-webkit-text-fill-color:var(--green)!important}
+.c-med{color:var(--warn)!important;-webkit-text-fill-color:var(--warn)!important}
+.c-hi{color:var(--danger)!important;-webkit-text-fill-color:var(--danger)!important}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;right:24px;z-index:200;background:var(--panel2);border:1px solid var(--border2);padding:10px 18px;border-radius:10px;font-size:.78rem;backdrop-filter:blur(12px);transform:translateY(80px);opacity:0;transition:all .4s cubic-bezier(.34,1.56,.64,1)}
+.toast.show{transform:none;opacity:1}
+
+@media(max-width:1200px){.grid{grid-template-columns:280px 1fr}.panel.last{display:none}}
+@media(max-width:720px){.sidebar{display:none}.content{margin-left:0}.topbar{left:0}.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="bg-mesh"></div>
+<div class="bg-grid"></div>
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="sb-logo"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M8 12h1l1-3 2 6 2-8 1 5h1" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+  <a href="/dashboard" class="nav on"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="tip">Dashboard</span></a>
+  <a href="/history" class="nav"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span class="tip">History</span></a>
+  <a href="/settings" class="nav"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg><span class="tip">Settings</span></a>
+  <div class="sb-bot">
+    <a href="/logout" class="nav"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span class="tip">Sign Out</span></a>
+    <div class="avatar">{{ user.initials }}</div>
+  </div>
+</nav>
+
+<!-- TOPBAR -->
+<header class="topbar">
+  <span class="ptitle">NEUROSCAN</span>
+  <div class="pill"><div class="ldot" id="ldot"></div><span id="liveText">Idle</span></div>
+  <div class="pill" id="accPill" style="display:none">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+    <span id="accVal">—</span>
+  </div>
+  <button class="tbtn" onclick="exportCSV()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Export
+  </button>
+  <a href="/history" class="tbtn">History</a>
+  <a href="/settings" class="tbtn">Settings</a>
+  <button class="tbtn primary" id="startBtn" onclick="toggleAnalysis()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="startIcon"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+    <span id="startLabel">Start Analysis</span>
+  </button>
+</header>
+
+<div class="content">
+<div class="grid">
+
+<!-- ══ LEFT PANEL ══ -->
+<div class="panel">
+  <div class="sl">Camera Feed</div>
+  <div class="card" style="padding:12px">
+    <div class="sensor-row">
+      <div class="sbadge off" id="camBadge"><div class="sdot"></div>Camera</div>
+      <div class="sbadge off" id="blinkBadge"><div class="sdot"></div>Blink AI</div>
+      <div class="sbadge off" id="micBadge"><div class="sdot"></div>Microphone</div>
+    </div>
+    <div class="cam-wrap">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas class="lm-canvas" id="lmCanvas"></canvas>
+      <div class="scan-ov" id="scanOv">
+        <div class="scan-line"></div>
+        <div class="c-tl"></div><div class="c-tr"></div>
+        <div class="c-bl"></div><div class="c-br"></div>
+        <div class="face-tag" id="faceTag">Initializing…</div>
+      </div>
+      <div class="cam-off" id="camOff">
+        <svg viewBox="0 0 24 24"><path d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.361a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+        <p>Camera access needed</p>
+      </div>
+    </div>
+    <div class="eeg"><canvas id="eegCanvas"></canvas></div>
+    <div class="bottom-row">
+      <div class="emot" id="emotionBadge">😐 Neutral</div>
+      <div class="hr-badge" id="hrBadge">♥ -- bpm</div>
+      <div class="hrv-badge" id="hrvBadge">HRV -- ms</div>
+    </div>
+  </div>
+
+  <div class="notif-bar" id="notifBar">🚨 <span>High stress for 5+ min. Take a break!</span></div>
+
+  <div class="sl">Biometrics</div>
+  <div class="card">
+    <div class="rings">
+      <div class="ri"><div class="rw"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="33" class="rbg"/><circle cx="40" cy="40" r="33" class="rfill ra" id="rA"/></svg><div class="rv" id="rvA">--</div></div><div class="rn">Blink/min</div></div>
+      <div class="ri"><div class="rw"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="33" class="rbg"/><circle cx="40" cy="40" r="33" class="rfill rb" id="rB"/></svg><div class="rv" id="rvB">--</div></div><div class="rn">Voice</div></div>
+      <div class="ri"><div class="rw"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="33" class="rbg"/><circle cx="40" cy="40" r="33" class="rfill rc" id="rC"/></svg><div class="rv" id="rvC">--</div></div><div class="rn">Tension</div></div>
+    </div>
+  </div>
+
+  <div class="sl">Cognitive State</div>
+  <div class="mini-grid">
+    <div class="mini">
+      <div class="mini-label">Focus</div>
+      <div class="mini-val" id="focusVal" style="color:var(--green)">--</div>
+      <div class="mini-bar"><div class="mini-fill" id="focusFill" style="background:var(--green);width:0%"></div></div>
+    </div>
+    <div class="mini">
+      <div class="mini-label">Fatigue</div>
+      <div class="mini-val" id="fatigueVal" style="color:var(--warn)">--</div>
+      <div class="mini-bar"><div class="mini-fill" id="fatigueFill" style="background:var(--warn);width:0%"></div></div>
+    </div>
+    <div class="mini">
+      <div class="mini-label">Anxiety</div>
+      <div class="mini-val" id="anxietyVal" style="color:var(--purple)">--</div>
+      <div class="mini-bar"><div class="mini-fill" id="anxietyFill" style="background:var(--purple);width:0%"></div></div>
+    </div>
+    <div class="mini">
+      <div class="mini-label">Calm</div>
+      <div class="mini-val" id="calmVal" style="color:var(--accent)">--</div>
+      <div class="mini-bar"><div class="mini-fill" id="calmFill" style="background:var(--accent);width:0%"></div></div>
+    </div>
+  </div>
+
+  <div class="sl">Breathing Exercise</div>
+  <div class="breath">
+    <div class="bc" id="breathCircle" onclick="startBreath()">BREATHE</div>
+    <div class="bl" id="breathLbl">Click to start 4-7-8 exercise</div>
+    <button class="bbtn" onclick="startBreath()">Start Guide</button>
+  </div>
+
+  <div class="sl" style="margin-top:12px">Weekly Heatmap</div>
+  <div class="card">
+    <div style="font-size:.58rem;color:var(--muted);margin-bottom:6px;letter-spacing:.08em">MON–SUN · Last 4 weeks</div>
+    <div class="heatmap" id="heatmap"></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+      <span style="font-size:.58rem;color:var(--muted)">Low</span>
+      <div style="flex:1;height:4px;border-radius:2px;background:linear-gradient(to right,rgba(52,211,153,.3),rgba(251,191,36,.5),rgba(248,113,113,.7))"></div>
+      <span style="font-size:.58rem;color:var(--muted)">High</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CENTER PANEL ══ -->
+<div class="panel">
+  <div class="sl">Stress Index</div>
+  <div class="card">
+    <div class="meter-wrap">
+      <div class="msw">
+        <svg viewBox="0 0 240 132">
+          <defs><linearGradient id="arcG" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#34d399"/><stop offset="50%" stop-color="#fbbf24"/><stop offset="100%" stop-color="#f87171"/></linearGradient></defs>
+          <path d="M24 124 A96 96 0 0 1 216 124" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="14" stroke-linecap="round"/>
+          <path d="M24 124 A96 96 0 0 1 216 124" fill="none" stroke="url(#arcG)" stroke-width="14" stroke-linecap="round" stroke-dasharray="302" stroke-dashoffset="302" id="arcFill" style="transition:stroke-dashoffset .9s ease"/>
+          <line x1="120" y1="124" x2="120" y2="40" stroke="white" stroke-width="2.5" stroke-linecap="round" id="needleLine" transform-origin="120 124" transform="rotate(-90)"/>
+          <circle cx="120" cy="124" r="6" fill="white"/>
+          <circle cx="120" cy="124" r="3" fill="var(--bg)"/>
+        </svg>
+      </div>
+      <div class="mticks"><span>LOW</span><span>MED</span><span>HIGH</span></div>
+      <div class="snum" id="sNum">--</div>
+      <div class="slbl" id="sLbl">Awaiting Data</div>
+      <div class="strend" id="sTrend"></div>
+      <div class="mood">
+        <div class="mi" onclick="setMood(this,'😴')">😴</div>
+        <div class="mi" onclick="setMood(this,'😊')">😊</div>
+        <div class="mi on" onclick="setMood(this,'😐')">😐</div>
+        <div class="mi" onclick="setMood(this,'😟')">😟</div>
+        <div class="mi" onclick="setMood(this,'😤')">😤</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI INSIGHTS -->
+  <div class="sl">AI Insights</div>
+  <div class="ai-insights">
+    <div class="ai-header"><div class="ai-dot"></div>Claude Analysis</div>
+    <div class="ai-text" id="aiInsight">Start analysis to receive personalized AI insights about your cognitive and stress patterns.</div>
+  </div>
+
+  <!-- MULTI-METRIC CHART -->
+  <div class="sl">Live Metrics</div>
+  <div class="chart-tabs">
+    <button class="ctab on" onclick="setMetric(this,'stress')">Stress</button>
+    <button class="ctab focus-tab" onclick="setMetric(this,'focus')">Focus</button>
+    <button class="ctab fatigue-tab" onclick="setMetric(this,'fatigue')">Fatigue</button>
+    <button class="ctab anxiety-tab" onclick="setMetric(this,'anxiety')">Anxiety</button>
+    <button class="ctab multi-tab" onclick="setMetric(this,'multi')">All Metrics</button>
+  </div>
+  <div class="card"><canvas id="mainChart" style="max-height:170px"></canvas></div>
+
+  <!-- COMPONENT CHART — blink + voice + face breakdown -->
+  <div class="sl">Signal Breakdown</div>
+  <div class="card"><canvas id="componentChart" style="max-height:130px"></canvas></div>
+
+  <div class="sl">Session Stats</div>
+  <div class="stats">
+    <div class="sbox"><div class="sv" id="statTime">0:00</div><div class="slb">Duration</div></div>
+    <div class="sbox"><div class="sv" id="statCount">0</div><div class="slb">Readings</div></div>
+    <div class="sbox"><div class="sv" id="statAvg">--</div><div class="slb">Avg Stress</div></div>
+    <div class="sbox"><div class="sv" id="statPeak">--</div><div class="slb">Peak Stress</div></div>
+  </div>
+</div>
+
+<!-- ══ RIGHT PANEL ══ -->
+<div class="panel last">
+  <div class="sl">Risk Assessment</div>
+  <div class="risk" id="riskBadge">
+    <div class="risk-emoji" id="riskEmoji">🟢</div>
+    <div class="risk-title" id="riskTitle">No Risk</div>
+    <div class="risk-acc">Confidence: <strong id="accText">--</strong></div>
+  </div>
+
+  <div class="sl">Signals Detected</div>
+  <div class="card"><ul class="taglist" id="reasonsList"><li class="tag ph">Analysis not running yet</li></ul></div>
+
+  <div class="sl">Recommendations</div>
+  <div class="card"><ul class="taglist" id="suggList"><li class="tag ph">Start analysis to receive advice</li></ul></div>
+
+  <div class="sl">Stress Distribution</div>
+  <div class="card"><canvas id="donutChart" style="max-height:150px"></canvas></div>
+
+  <div class="sl">Radar Overview</div>
+  <div class="card"><canvas id="radarChart" style="max-height:180px"></canvas></div>
+
+  <div class="sl">Profile</div>
+  <div class="card">
+    <div class="prow">
+      <div class="pava">{{ user.initials }}</div>
+      <div><div class="pname">{{ user.name }}</div><div class="pplan">{{ week_sessions }} sessions this week</div></div>
+      <a href="/settings" class="pswitch">Settings</a>
+    </div>
+    <div class="pstat"><span>Total sessions</span><span>{{ total_sessions }}</span></div>
+    <div class="pstat"><span>Avg baseline</span><span id="baselineVal">--</span></div>
+    <div class="pstat"><span>Member since</span><span>{{ user.created_at.strftime('%b %Y') }}</span></div>
+  </div>
+</div>
+
+</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="/static/js/blink.js"></script>
+<script src="/static/js/voice.js"></script>
+<script>
+// ─── PREFS ────────────────────────────────────────────────────────────────
+const prefs       = JSON.parse(localStorage.getItem('neuroscan_prefs') || '{}');
+const VOICE_ALERTS  = prefs.voiceAlerts  !== false;
+const USE_CLAUDE    = prefs.claudeVision !== false;
+const AUTO_SAVE     = prefs.autoSave     !== false;
+const BROWSER_NOTIF = prefs.browserNotif === true;
+
+// ─── STATE ────────────────────────────────────────────────────────────────
+let started=false, streamReady=false, mpReady=false;
+let lastStress=null, lastSpoken='', peak=0, sum=0;
+let sessionStart=null, timerInt=null;
+let highStressStart=null;
+let currentBPM=0;
+let activeMetric='stress';
+
+// History arrays for each metric
+const history = { stress:[], focus:[], fatigue:[], anxiety:[], labels:[] };
+const compHistory = { face:[], blink:[], voice:[], labels:[] };
+const MAX_PTS = 40;
+
+// Detector instances
+const blinkDetector = new BlinkDetector();
+const voiceAnalyzer = new VoiceAnalyzer();
+
+// ─── HEATMAP ─────────────────────────────────────────────────────────────
+const heatmapData = {{ heatmap_json|safe }};
+(function(){
+  const hm=document.getElementById('heatmap');
+  const today=new Date();
+  for(let i=27;i>=0;i--){
+    const d=new Date(today); d.setDate(d.getDate()-i);
+    const key=d.toISOString().split('T')[0];
+    const v=(heatmapData[key]||0)/100;
+    const el=document.createElement('div'); el.className='hm';
+    if(!heatmapData[key])el.style.background='rgba(255,255,255,.04)';
+    else if(v<.3)el.style.background=`rgba(52,211,153,${.2+v*.6})`;
+    else if(v<.6)el.style.background=`rgba(251,191,36,${.2+v*.5})`;
+    else el.style.background=`rgba(248,113,113,${.2+v*.6})`;
+    el.title=heatmapData[key]?`${key}: ${heatmapData[key]}% avg stress`:'No data';
+    hm.appendChild(el);
+  }
+})();
+
+// ─── CAMERA ──────────────────────────────────────────────────────────────
+const video=document.getElementById('video');
+navigator.mediaDevices.getUserMedia({video:{width:640,height:480},audio:false}).then(s=>{
+  video.srcObject=s; streamReady=true;
+  document.getElementById('camOff').classList.add('hidden');
+  setSensor('camBadge','ok','Camera');
+  toast('📷 Camera connected');
+  initMediaPipe();
+}).catch(()=>toast('❌ Camera access denied'));
+
+function captureImage(){
+  if(!streamReady)return null;
+  const c=document.createElement('canvas');
+  c.width=video.videoWidth||640; c.height=video.videoHeight||480;
+  c.getContext('2d').drawImage(video,0,0,c.width,c.height);
+  return c.toDataURL('image/jpeg',.72);
+}
+
+// ─── MEDIAPIPE ────────────────────────────────────────────────────────────
+const lmCanvas=document.getElementById('lmCanvas'), lmCtx=lmCanvas.getContext('2d');
+function initMediaPipe(){
+  const fm=new FaceMesh({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`});
+  fm.setOptions({maxNumFaces:1,refineLandmarks:true,minDetectionConfidence:.5,minTrackingConfidence:.5});
+  fm.onResults(onFaceResults);
+  const cam=new Camera(video,{
+    onFrame:async()=>{if(started)await fm.send({image:video})},
+    width:640,height:480
+  });
+  cam.start().then(()=>{mpReady=true;setSensor('blinkBadge','ok','Blink AI');toast('👁 MediaPipe ready')})
+    .catch(()=>setSensor('blinkBadge','warn','Blink (fallback)'));
+}
+function onFaceResults(results){
+  lmCanvas.width=video.videoWidth||640; lmCanvas.height=video.videoHeight||480;
+  lmCtx.clearRect(0,0,lmCanvas.width,lmCanvas.height);
+  if(!results.multiFaceLandmarks?.length)return;
+  const lm=results.multiFaceLandmarks[0];
+  currentBPM=blinkDetector.update(lm);
+  if(!started)return;
+  const W=lmCanvas.width,H=lmCanvas.height;
+  // Draw eye landmarks
+  lmCtx.fillStyle='rgba(56,189,248,.8)';
+  [33,160,158,133,153,144,362,385,387,263,373,380].forEach(i=>{
+    const p=lm[i];
+    lmCtx.beginPath();lmCtx.arc(p.x*W,p.y*H,2,0,Math.PI*2);lmCtx.fill();
+  });
+  // Draw face mesh contour (simplified)
+  const CONTOUR=[10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109];
+  lmCtx.beginPath();lmCtx.strokeStyle='rgba(56,189,248,.2)';lmCtx.lineWidth=1;
+  CONTOUR.forEach((i,idx)=>{const p=lm[i];idx===0?lmCtx.moveTo(p.x*W,p.y*H):lmCtx.lineTo(p.x*W,p.y*H)});
+  lmCtx.closePath();lmCtx.stroke();
+}
+
+// ─── EEG WAVE ─────────────────────────────────────────────────────────────
+const eegC=document.getElementById('eegCanvas'),eegCtx=eegC.getContext('2d');
+let eegData=new Array(200).fill(28),eegAmp=3;
+function resizeEEG(){eegC.width=eegC.offsetWidth;eegC.height=eegC.offsetHeight}
+resizeEEG();window.addEventListener('resize',resizeEEG);
+function drawEEG(){
+  const W=eegC.width,H=eegC.height;eegCtx.clearRect(0,0,W,H);
+  eegData.shift();eegData.push(H/2+Math.sin(Date.now()/280)*eegAmp+(Math.random()-.5)*eegAmp*2);
+  eegCtx.beginPath();eegCtx.strokeStyle='rgba(56,189,248,.75)';eegCtx.lineWidth=1.5;
+  eegCtx.shadowColor='rgba(56,189,248,.4)';eegCtx.shadowBlur=5;
+  for(let i=0;i<eegData.length;i++){const x=i*(W/eegData.length),y=eegData[i];i===0?eegCtx.moveTo(x,y):eegCtx.lineTo(x,y)}
+  eegCtx.stroke();requestAnimationFrame(drawEEG);
+}
+drawEEG();
+
+// ─── CHARTS ───────────────────────────────────────────────────────────────
+const chartColors={
+  stress:  {border:'rgba(248,113,113,.9)',  bg:'rgba(248,113,113,.07)'},
+  focus:   {border:'rgba(52,211,153,.9)',   bg:'rgba(52,211,153,.07)'},
+  fatigue: {border:'rgba(251,191,36,.9)',   bg:'rgba(251,191,36,.07)'},
+  anxiety: {border:'rgba(167,139,250,.9)',  bg:'rgba(167,139,250,.07)'},
+};
+const chartOpts={
+  animation:{duration:400},responsive:true,maintainAspectRatio:false,
+  scales:{
+    y:{min:0,max:100,grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#475569',font:{size:10}}},
+    x:{grid:{display:false},ticks:{display:false}}
+  },
+  plugins:{legend:{display:false},tooltip:{backgroundColor:'#080f1e',borderColor:'rgba(56,189,248,.3)',borderWidth:1,bodyColor:'#e2e8f0',callbacks:{label:c=>` ${c.parsed.y}%`}}}
+};
+
+// Main multi-metric chart
+const mainCtx=document.getElementById('mainChart').getContext('2d');
+let mainChart=new Chart(mainCtx,{
+  type:'line',
+  data:{labels:[],datasets:[{label:'Stress',data:[],borderColor:chartColors.stress.border,backgroundColor:chartColors.stress.bg,borderWidth:2,fill:true,tension:.4,pointRadius:2,pointBackgroundColor:chartColors.stress.border}]},
+  options:{...chartOpts}
+});
+
+// Component breakdown chart — blink, voice, face as 3 lines
+const compCtx=document.getElementById('componentChart').getContext('2d');
+const compChart=new Chart(compCtx,{
+  type:'line',
+  data:{
+    labels:[],
+    datasets:[
+      {label:'Blink',data:[],borderColor:'rgba(56,189,248,.85)',backgroundColor:'transparent',borderWidth:1.5,tension:.4,pointRadius:1.5,pointBackgroundColor:'#38bdf8'},
+      {label:'Voice',data:[],borderColor:'rgba(99,102,241,.85)',backgroundColor:'transparent',borderWidth:1.5,tension:.4,pointRadius:1.5,pointBackgroundColor:'#6366f1',borderDash:[4,3]},
+      {label:'Face', data:[],borderColor:'rgba(251,191,36,.85)', backgroundColor:'transparent',borderWidth:1.5,tension:.4,pointRadius:1.5,pointBackgroundColor:'#fbbf24',borderDash:[2,4]}
+    ]
+  },
+  options:{
+    animation:{duration:400},responsive:true,maintainAspectRatio:false,
+    scales:{y:{min:0,max:100,grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#475569',font:{size:9}}},x:{grid:{display:false},ticks:{display:false}}},
+    plugins:{
+      legend:{display:true,position:'top',labels:{color:'#64748b',font:{size:9},boxWidth:12,padding:10}},
+      tooltip:{backgroundColor:'#080f1e',borderColor:'rgba(56,189,248,.3)',borderWidth:1,bodyColor:'#e2e8f0'}
+    }
+  }
+});
+
+// Donut distribution chart
+const donutChart=new Chart(document.getElementById('donutChart').getContext('2d'),{
+  type:'doughnut',
+  data:{labels:['Low','Moderate','High'],datasets:[{data:[33,33,34],backgroundColor:['rgba(52,211,153,.65)','rgba(251,191,36,.65)','rgba(248,113,113,.65)'],borderColor:'transparent',borderWidth:0}]},
+  options:{animation:{duration:600},responsive:true,maintainAspectRatio:false,cutout:'70%',plugins:{legend:{display:false},tooltip:{backgroundColor:'#080f1e',borderColor:'rgba(56,189,248,.3)',borderWidth:1,bodyColor:'#e2e8f0'}}}
+});
+
+// Radar chart — focus/fatigue/anxiety/stress/calm
+const radarChart=new Chart(document.getElementById('radarChart').getContext('2d'),{
+  type:'radar',
+  data:{
+    labels:['Stress','Focus','Fatigue','Anxiety','Calm'],
+    datasets:[{
+      label:'Current',data:[0,0,0,0,100],
+      borderColor:'rgba(56,189,248,.8)',backgroundColor:'rgba(56,189,248,.08)',
+      borderWidth:2,pointBackgroundColor:'#38bdf8',pointRadius:3
+    }]
+  },
+  options:{
+    animation:{duration:600},responsive:true,maintainAspectRatio:false,
+    scales:{r:{min:0,max:100,ticks:{display:false,stepSize:25},grid:{color:'rgba(255,255,255,.06)'},angleLines:{color:'rgba(255,255,255,.06)'},pointLabels:{color:'#64748b',font:{size:9}}}},
+    plugins:{legend:{display:false},tooltip:{backgroundColor:'#080f1e',borderColor:'rgba(56,189,248,.3)',borderWidth:1,bodyColor:'#e2e8f0'}}
+  }
+});
+
+// ─── METRIC SWITCHER ─────────────────────────────────────────────────────
+function setMetric(el,metric){
+  document.querySelectorAll('.ctab').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on');
+  activeMetric=metric;
+  updateMainChart();
+}
+
+function updateMainChart(){
+  if(activeMetric==='multi'){
+    mainChart.data.datasets=[
+      {label:'Stress', data:[...history.stress], borderColor:chartColors.stress.border, backgroundColor:'transparent',borderWidth:1.5,tension:.4,pointRadius:1.5,fill:false},
+      {label:'Focus',  data:[...history.focus],  borderColor:chartColors.focus.border,  backgroundColor:'transparent',borderWidth:1.5,tension:.4,pointRadius:1.5,fill:false,borderDash:[4,3]},
+      {label:'Fatigue',data:[...history.fatigue],borderColor:chartColors.fatigue.border,backgroundColor:'transparent',borderWidth:1.5,tension:.4,pointRadius:1.5,fill:false,borderDash:[2,4]},
+      {label:'Anxiety',data:[...history.anxiety],borderColor:chartColors.anxiety.border,backgroundColor:'transparent',borderWidth:1.5,tension:.4,pointRadius:1.5,fill:false,borderDash:[6,2]},
+    ];
+    mainChart.options.plugins.legend.display=true;
+    mainChart.options.plugins.legend.labels={color:'#64748b',font:{size:9},boxWidth:12,padding:10};
+  } else {
+    const c=chartColors[activeMetric]||chartColors.stress;
+    mainChart.data.datasets=[{label:activeMetric,data:[...history[activeMetric]],borderColor:c.border,backgroundColor:c.bg,borderWidth:2,fill:true,tension:.4,pointRadius:2,pointBackgroundColor:c.border}];
+    mainChart.options.plugins.legend.display=false;
+  }
+  mainChart.data.labels=[...history.labels];
+  mainChart.update();
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────
+function setRing(arc,val){
+  const p=Math.min(100,Math.max(0,val));
+  arc.style.strokeDashoffset=207-(p/100)*207;
+  arc.style.stroke=val>70?'var(--danger)':val>45?'var(--warn)':'';
+}
+function setMeter(pct){
+  document.getElementById('arcFill').style.strokeDashoffset=302-(pct/100)*302;
+  document.getElementById('needleLine').setAttribute('transform',`rotate(${-90+(pct/100)*180},120,124)`);
+}
+function setSensor(id,cls,label){const el=document.getElementById(id);el.className=`sbadge ${cls}`;el.innerHTML=`<div class="sdot"></div>${label}`}
+function setMini(id,fillId,val,max=100){
+  document.getElementById(id).textContent=Math.round(val);
+  document.getElementById(fillId).style.width=Math.min(100,(val/max)*100)+'%';
+}
+function speak(t){if(!VOICE_ALERTS)return;window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.rate=.95;u.pitch=1.05;window.speechSynthesis.speak(u)}
+function col(v){if(v<30)return 'rgba(52,211,153,.7)';if(v<60)return 'rgba(251,191,36,.7)';return 'rgba(248,113,113,.7)'}
+
+// Generate AI insight text from metrics
+function generateInsight(data){
+  const s=Math.round(data.stress), f=Math.round(data.focus), fa=Math.round(data.fatigue), a=Math.round(data.anxiety);
+  const em=data.emotion||'neutral';
+  if(s<30){
+    if(f>70)return `<strong>Excellent cognitive state.</strong> Focus is high at ${f}% and stress is minimal at ${s}%. Your facial expression (${em}) confirms a relaxed, productive mindset. This is an optimal window for deep work or learning.`;
+    return `<strong>Calm and balanced.</strong> Stress levels are low (${s}%), though focus could improve. Consider moving to a task-oriented environment to channel this calm energy productively.`;
+  }else if(s<60){
+    if(fa>60)return `<strong>Signs of mental fatigue.</strong> Moderate stress (${s}%) combined with fatigue at ${fa}% suggests you may have been working for extended periods. A 10-minute break could restore clarity.`;
+    if(a>60)return `<strong>Mild anxiety patterns detected.</strong> Voice stress and facial tension indicate ${a}% anxiety. Try the 4-7-8 breathing exercise below — it activates the parasympathetic nervous system.`;
+    return `<strong>Moderate cognitive load.</strong> Stress at ${s}% is manageable. Focus remains at ${f}% — consider short breaks every 45 minutes to sustain this level.`;
+  }else{
+    if(fa>70)return `<strong>High stress + fatigue — critical.</strong> At ${s}% stress and ${fa}% fatigue, your cognitive performance is significantly impaired. Stop working, hydrate, and rest for at least 15 minutes.`;
+    return `<strong>Elevated stress response.</strong> Stress at ${s}% with anxiety at ${a}% detected. Your ${em} expression and biometrics suggest overload. Prioritize stepping away from the screen immediately.`;
+  }
+}
+
+// ─── TOGGLE ──────────────────────────────────────────────────────────────
+function toggleAnalysis(){started?stopAnalysis():startAnalysis()}
+
+async function startAnalysis(){
+  started=true; sessionStart=Date.now();
+  Object.keys(history).forEach(k=>history[k]=[]);
+  Object.keys(compHistory).forEach(k=>compHistory[k]=[]);
+  peak=0; sum=0;
+  document.getElementById('startLabel').textContent='Stop Analysis';
+  document.getElementById('startBtn').classList.add('running');
+  document.getElementById('ldot').classList.add('on');
+  document.getElementById('liveText').textContent='Live';
+  document.getElementById('scanOv').classList.add('on');
+  document.getElementById('accPill').style.display='flex';
+  eegAmp=14; timerInt=setInterval(updateTimer,1000);
+  const micOk=await voiceAnalyzer.start();
+  setSensor('micBadge',micOk?'ok':'warn',micOk?'Microphone':'Mic (denied)');
+  if(AUTO_SAVE) fetch('/api/session/start',{method:'POST'}).catch(()=>{});
+  toast('🧠 Analysis started — all sensors active');
+  runLoop();
+}
+
+function stopAnalysis(){
+  started=false;
+  document.getElementById('startLabel').textContent='Start Analysis';
+  document.getElementById('startBtn').classList.remove('running');
+  document.getElementById('ldot').classList.remove('on');
+  document.getElementById('liveText').textContent='Idle';
+  document.getElementById('scanOv').classList.remove('on');
+  eegAmp=3; clearInterval(timerInt);
+  voiceAnalyzer.stop(); setSensor('micBadge','off','Microphone');
+  document.getElementById('notifBar').classList.remove('show');
+  highStressStart=null;
+  const readingCount=history.stress.length;
+  if(AUTO_SAVE && readingCount>0){
+    const avg=sum/readingCount;
+    fetch('/api/session/stop',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({avg_stress:avg,peak_stress:peak,readings:readingCount,stress_values:history.stress.slice(-50)})
+    }).catch(()=>{});
+  }
+  toast('⏹ Session saved');
+}
+
+// ─── MAIN LOOP ────────────────────────────────────────────────────────────
+function runLoop(){
+  if(!started)return;
+  const img=captureImage();
+  const blinkScore=blinkDetector.toStressScore(currentBPM);
+  const voiceSample=voiceAnalyzer.getSample();
+  const voiceScore=voiceSample.stressScore;
+
+  // Update blink + voice rings immediately
+  setRing(document.getElementById('rA'),blinkScore);
+  setRing(document.getElementById('rB'),voiceScore);
+  document.getElementById('rvA').textContent=currentBPM+'/m';
+  document.getElementById('rvB').textContent=Math.round(voiceScore);
+
+  fetch('/analyze',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({image:img,blink:blinkScore,voice:voiceScore,use_claude:USE_CLAUDE})
+  })
+  .then(r=>r.json())
+  .then(data=>{
+    if(data.error){toast('⚠️ '+data.error);return}
+    const s=data.stress, focus=data.focus, fatigue=data.fatigue, anxiety=data.anxiety;
+    const calm=Math.max(0,100-s);
+    const fs=data.components?.face||50;
+    const bk=data.components?.blink||blinkScore;
+    const vc=data.components?.voice||voiceScore;
+
+    sum+=s; if(s>peak)peak=s;
+
+    // Face ring + tension ring
+    setRing(document.getElementById('rC'),fs);
+    document.getElementById('rvC').textContent=Math.round(fs);
+
+    // EEG amplitude
+    eegAmp=4+s*.22;
+
+    // Emotion badge
+    const em=data.emotion||'neutral';
+    const emojis={happy:'😊',angry:'😠',fear:'😨',sad:'😢',surprise:'😮',neutral:'😐',disgust:'🤢',unknown:'😐'};
+    document.getElementById('emotionBadge').textContent=`${emojis[em]||'😐'} ${em.charAt(0).toUpperCase()+em.slice(1)}`;
+
+    // HR + HRV badges
+    document.getElementById('hrBadge').textContent=`♥ ${data.heart_rate} bpm`;
+    document.getElementById('hrvBadge').textContent=`HRV ${data.hrv} ms`;
+
+    // Stress meter
+    setMeter(s);
+    const numEl=document.getElementById('sNum');
+    numEl.textContent=Math.round(s)+'%';
+    numEl.className='snum '+(s<30?'c-low':s<60?'c-med':'c-hi');
+    document.getElementById('sLbl').textContent=data.level;
+    document.getElementById('sTrend').textContent=lastStress!==null?(s>lastStress?'📈 Increasing':'📉 Decreasing'):'';
+    lastStress=s;
+
+    // Cognitive state mini cards
+    setMini('focusVal','focusFill',focus);
+    setMini('fatigueVal','fatigueFill',fatigue);
+    setMini('anxietyVal','anxietyFill',anxiety);
+    setMini('calmVal','calmFill',calm);
+
+    // AI insight
+    document.getElementById('aiInsight').innerHTML=generateInsight({...data,emotion:em});
+
+    // Risk badge
+    const badge=document.getElementById('riskBadge');
+    badge.className='risk '+(s<30?'ok':s<60?'warn':'hi');
+    document.getElementById('riskEmoji').textContent=s<30?'🟢':s<60?'🟡':'🔴';
+    document.getElementById('riskTitle').textContent=data.risk;
+    document.getElementById('accText').textContent=data.accuracy;
+    document.getElementById('accVal').textContent=data.accuracy;
+    document.getElementById('faceTag').textContent=s<30?'Calm Detected':s<60?'Mild Tension':'High Stress';
+
+    // Tag lists
+    document.getElementById('reasonsList').innerHTML=data.reasons.map(r=>`<li class="tag reason">⚡ ${r}</li>`).join('');
+    document.getElementById('suggList').innerHTML=data.suggestions.map(sg=>`<li class="tag suggest">💡 ${sg}</li>`).join('');
+
+    // Push to history
+    ['stress','focus','fatigue','anxiety'].forEach(k=>{
+      history[k].push(Math.round(data[k]||0));
+      if(history[k].length>MAX_PTS) history[k].shift();
+    });
+    history.labels.push('');
+    if(history.labels.length>MAX_PTS) history.labels.shift();
+    updateMainChart();
+
+    // Component chart
+    compChart.data.datasets[0].data.push(Math.round(bk));
+    compChart.data.datasets[1].data.push(Math.round(vc));
+    compChart.data.datasets[2].data.push(Math.round(fs));
+    compChart.data.labels.push('');
+    [0,1,2].forEach(i=>{ if(compChart.data.datasets[i].data.length>MAX_PTS){compChart.data.datasets[i].data.shift();compChart.data.labels.shift()}});
+    compChart.update();
+
+    // Donut
+    const lo=history.stress.filter(v=>v<30).length,me=history.stress.filter(v=>v>=30&&v<60).length,hi=history.stress.filter(v=>v>=60).length,tot=history.stress.length||1;
+    donutChart.data.datasets[0].data=[lo/tot*100,me/tot*100,hi/tot*100];
+    donutChart.update();
+
+    // Radar
+    radarChart.data.datasets[0].data=[Math.round(s),Math.round(focus),Math.round(fatigue),Math.round(anxiety),Math.round(calm)];
+    radarChart.update();
+
+    // Session stats
+    const rc=history.stress.length;
+    document.getElementById('statCount').textContent=rc;
+    document.getElementById('statAvg').textContent=rc?Math.round(sum/rc)+'%':'--';
+    document.getElementById('statPeak').textContent=Math.round(peak)+'%';
+    document.getElementById('baselineVal').textContent=rc?Math.round(sum/rc)+'%':'--';
+
+    // 5-min high stress notification
+    if(s>=60){
+      if(!highStressStart)highStressStart=Date.now();
+      else if(Date.now()-highStressStart>5*60*1000){
+        document.getElementById('notifBar').classList.add('show');
+        if(BROWSER_NOTIF&&Notification.permission==='granted') new Notification('NeuroScan',{body:'High stress for 5+ minutes. Take a break!'});
+      }
+    }else{highStressStart=null;document.getElementById('notifBar').classList.remove('show')}
+
+    // Voice alert
+    if(data.level!==lastSpoken){
+      if(s>70)speak('High stress detected. Please take a break.');
+      else if(s>40)speak('Moderate stress. Breathe slowly.');
+      else speak('You are calm. Keep it up.');
+      lastSpoken=data.level;
+    }
+  })
+  .catch(()=>toast('❌ Backend not responding'));
+  setTimeout(runLoop,2000);
+}
+
+// ─── TIMER ───────────────────────────────────────────────────────────────
+function updateTimer(){
+  const e=Math.floor((Date.now()-sessionStart)/1000);
+  document.getElementById('statTime').textContent=`${Math.floor(e/60)}:${(e%60).toString().padStart(2,'0')}`;
+}
+
+// ─── BREATHING ────────────────────────────────────────────────────────────
+let breathRunning=false;
+function startBreath(){
+  if(breathRunning)return; breathRunning=true;
+  const c=document.getElementById('breathCircle'),l=document.getElementById('breathLbl');
+  const phases=[{t:'Inhale',d:4000,ex:true},{t:'Hold',d:7000,ex:true},{t:'Exhale',d:8000,ex:false}];
+  let p=0;
+  function next(){
+    const ph=phases[p%phases.length];
+    l.textContent=`${ph.t} (${ph.d/1000}s)`;c.textContent=ph.t.toUpperCase();
+    ph.ex?c.classList.add('exp'):c.classList.remove('exp');
+    p++;
+    if(p>=phases.length*3){breathRunning=false;c.textContent='DONE';l.textContent='Exercise complete';return}
+    setTimeout(next,ph.d);
+  }
+  next();
+}
+
+// ─── MOOD ────────────────────────────────────────────────────────────────
+function setMood(el,e){document.querySelectorAll('.mi').forEach(m=>m.classList.remove('on'));el.classList.add('on');toast(`Mood logged: ${e}`)}
+
+// ─── EXPORT ──────────────────────────────────────────────────────────────
+function exportCSV(){
+  const n=history.stress.length;
+  if(!n){toast('No data to export');return}
+  const rows=[['#','Stress%','Focus%','Fatigue%','Anxiety%','Timestamp'],
+    ...history.stress.map((v,i)=>[i+1,v,history.focus[i]||'',history.fatigue[i]||'',history.anxiety[i]||'',new Date(sessionStart+i*2000).toISOString()])
+  ];
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(rows.map(r=>r.join(',')).join('\n'));
+  a.download='neuroscan_'+Date.now()+'.csv'; a.click();
+  toast('✓ Full data exported (stress, focus, fatigue, anxiety)');
+}
+
+// ─── TOAST ───────────────────────────────────────────────────────────────
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),3200)}
+</script>
+</body>
+</html>
