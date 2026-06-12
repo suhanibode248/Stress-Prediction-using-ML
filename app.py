@@ -2,6 +2,9 @@
 NeuroScan — Flask backend v4
 Key fix: Claude Vision now correctly separates EMOTIONAL STATE from PHYSIOLOGICAL STRESS.
 Laughing/happy = low face_score. Angry/fearful = high face_score.
+
+Deployment: designed for Render (or any host with a persistent filesystem).
+Uses SQLite — simple, no external DB setup required.
 """
 import os, base64, anthropic, json, re
 from datetime import datetime, timedelta
@@ -13,9 +16,6 @@ from flask_login import (LoginManager, UserMixin, login_user,
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import bcrypt
-import ssl
-from sqlalchemy.pool import NullPool
-from sqlalchemy.engine import make_url
 from model import calculate_stress
 from dotenv import load_dotenv
 
@@ -24,67 +24,33 @@ load_dotenv()
 # ── App setup ─────────────────────────────────────────────────────────────
 app = Flask(__name__)
 
-# ── DB URL: use Postgres (DATABASE_URL), fallback to SQLite locally ────────
-# Wrapped in try/except — if ANYTHING here fails, fall back to SQLite so the
-# app still boots and /health can report the real error instead of a blank
-# FUNCTION_INVOCATION_FAILED crash.
-raw_db_url = os.environ.get("DATABASE_URL", "sqlite:///neuroscan.db")
-db_url_error = None
-
-try:
-    if raw_db_url.startswith("sqlite"):
-        db_url = raw_db_url
-    else:
-        url_obj = make_url(raw_db_url)
-        url_obj = url_obj.set(drivername="postgresql+pg8000")
-        url_obj = url_obj.set(query={})
-        db_url = str(url_obj)
-except Exception as e:
-    db_url_error = str(e)
-    db_url = "sqlite:///neuroscan.db"
+# ── DB: SQLite, stored in instance/ folder (persistent on Render via disk) ─
+# Render mounts a persistent disk at instance/ (see render.yaml), so this
+# file survives restarts/redeploys.
+basedir = os.path.abspath(os.path.dirname(__file__))
+instance_dir = os.path.join(basedir, "instance")
+os.makedirs(instance_dir, exist_ok=True)
+db_path = os.path.join(instance_dir, "neuroscan.db")
 
 app.config.update(
     SECRET_KEY               = os.environ.get("SECRET_KEY", "neuroscan-dev-change-me"),
-    SQLALCHEMY_DATABASE_URI  = db_url,
+    SQLALCHEMY_DATABASE_URI  = f"sqlite:///{db_path}",
     SQLALCHEMY_TRACK_MODIFICATIONS = False,
     PERMANENT_SESSION_LIFETIME = timedelta(days=7),
-    SESSION_COOKIE_SECURE    = os.environ.get("VERCEL") is not None,
     SESSION_COOKIE_SAMESITE  = "Lax",
 )
-
-# ── pg8000 + hosted Postgres (Neon/Supabase) SSL & pooling config ──────────
-try:
-    if "pg8000" in db_url:
-        ssl_ctx = ssl.create_default_context()
-        ssl_ctx.check_hostname = False
-        ssl_ctx.verify_mode = ssl.CERT_NONE
-        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-            "poolclass": NullPool,
-            "connect_args": {
-                "ssl_context": ssl_ctx,
-            },
-        }
-except Exception as e:
-    if not db_url_error:
-        db_url_error = str(e)
 
 db            = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
 
-# ── Rate limiter: use Redis if configured, memory otherwise ────────────────
-# Wrapped because a bad/unreachable Redis URL can throw at init time.
-redis_url = os.environ.get("UPSTASH_REDIS_URL") or os.environ.get("REDIS_URL")
-try:
-    limiter = Limiter(
-        get_remote_address,
-        app=app,
-        default_limits=["300 per day", "60 per hour"],
-        storage_uri=redis_url if redis_url else "memory://",
-    )
-except Exception as e:
-    print(f"[LIMITER INIT ERROR] {e}")
-    limiter = Limiter(get_remote_address, app=app, default_limits=["300 per day", "60 per hour"])
+# ── Rate limiter (in-memory — fine for a single persistent server) ────────
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["300 per day", "60 per hour"],
+    storage_uri="memory://",
+)
 
 # ── Anthropic client — never crash at import even if key is missing ───────
 try:
@@ -250,18 +216,11 @@ def health():
         status["database"] = "ok"
     except Exception as e:
         status["database"] = f"ERROR: {str(e)}"
-    status["database_url_set"] = bool(os.environ.get("DATABASE_URL"))
+    status["db_path"] = db_path
+    status["db_file_exists"] = os.path.exists(db_path)
     status["anthropic_key_set"] = bool(os.environ.get("ANTHROPIC_API_KEY"))
-    status["secret_key_set"] = bool(os.environ.get("SECRET_KEY"))
-    status["redis_set"] = bool(os.environ.get("UPSTASH_REDIS_URL") or os.environ.get("REDIS_URL"))
-    # Show the PROCESSED connection string with password masked, for debugging
-    try:
-        masked = make_url(db_url).render_as_string(hide_password=True)
-        status["processed_db_url"] = masked
-    except Exception as e:
-        status["processed_db_url"] = f"ERROR: {e}"
-    status["db_url_setup_error"] = db_url_error
     status["anthropic_client_ok"] = client is not None
+    status["secret_key_set"] = bool(os.environ.get("SECRET_KEY"))
     return jsonify(status)
 
 
