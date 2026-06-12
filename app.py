@@ -194,6 +194,22 @@ def analyze_face_claude(image_data: str) -> dict:
 
 
 # ── Routes ────────────────────────────────────────────────────────────────
+@app.route("/health")
+def health():
+    """Debug endpoint — check DB connectivity and env vars without exposing secrets."""
+    status = {"app": "ok"}
+    try:
+        db.session.execute(db.text("SELECT 1"))
+        status["database"] = "ok"
+    except Exception as e:
+        status["database"] = f"ERROR: {str(e)}"
+    status["database_url_set"] = bool(os.environ.get("DATABASE_URL"))
+    status["anthropic_key_set"] = bool(os.environ.get("ANTHROPIC_API_KEY"))
+    status["secret_key_set"] = bool(os.environ.get("SECRET_KEY"))
+    status["redis_set"] = bool(os.environ.get("UPSTASH_REDIS_URL") or os.environ.get("REDIS_URL"))
+    return jsonify(status)
+
+
 @app.route("/")
 def index():
     if current_user.is_authenticated:
@@ -207,34 +223,42 @@ def login():
     if current_user.is_authenticated:
         return redirect(url_for("dashboard"))
     if request.method == "POST":
-        data  = request.get_json(force=True) or {}
-        email = data.get("email", "").strip().lower()
-        pw    = data.get("password", "")
-        user  = User.query.filter_by(email=email).first()
-        if user and user.check_password(pw):
-            login_user(user, remember=data.get("remember", False))
-            return jsonify({"ok": True, "redirect": url_for("dashboard")})
-        return jsonify({"ok": False, "error": "Invalid email or password"}), 401
+        try:
+            data  = request.get_json(force=True) or {}
+            email = data.get("email", "").strip().lower()
+            pw    = data.get("password", "")
+            user  = User.query.filter_by(email=email).first()
+            if user and user.check_password(pw):
+                login_user(user, remember=data.get("remember", False))
+                return jsonify({"ok": True, "redirect": url_for("dashboard")})
+            return jsonify({"ok": False, "error": "Invalid email or password"}), 401
+        except Exception as e:
+            print(f"[LOGIN ERROR] {e}")
+            return jsonify({"ok": False, "error": f"Server error: {str(e)}"}), 500
     return render_template("login.html")
 
 
 @app.route("/register", methods=["POST"])
 @limiter.limit("5 per minute")
 def register():
-    data  = request.get_json(force=True) or {}
-    name  = data.get("name", "").strip()
-    email = data.get("email", "").strip().lower()
-    pw    = data.get("password", "")
-    if not name or not email or len(pw) < 6:
-        return jsonify({"ok": False, "error": "All fields required; password ≥ 6 chars"}), 400
-    if User.query.filter_by(email=email).first():
-        return jsonify({"ok": False, "error": "Email already registered"}), 409
-    user = User(name=name, email=email)
-    user.set_password(pw)
-    db.session.add(user)
-    db.session.commit()
-    login_user(user)
-    return jsonify({"ok": True, "redirect": url_for("dashboard")})
+    try:
+        data  = request.get_json(force=True) or {}
+        name  = data.get("name", "").strip()
+        email = data.get("email", "").strip().lower()
+        pw    = data.get("password", "")
+        if not name or not email or len(pw) < 6:
+            return jsonify({"ok": False, "error": "All fields required; password ≥ 6 chars"}), 400
+        if User.query.filter_by(email=email).first():
+            return jsonify({"ok": False, "error": "Email already registered"}), 409
+        user = User(name=name, email=email)
+        user.set_password(pw)
+        db.session.add(user)
+        db.session.commit()
+        login_user(user)
+        return jsonify({"ok": True, "redirect": url_for("dashboard")})
+    except Exception as e:
+        print(f"[REGISTER ERROR] {e}")
+        return jsonify({"ok": False, "error": f"Server error: {str(e)}"}), 500
 
 
 @app.route("/logout")
