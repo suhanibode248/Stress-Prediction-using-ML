@@ -170,3 +170,26 @@ def calculate_stress(
             "voice": round(voice, 1)
         }
     }
+
+
+# ── Baseline-relative helper (added) ──────────────────────────────────────
+def relative_to_baseline(stress: float, baseline: float) -> dict:
+    """
+    Compare current stress to user's personal baseline.
+    Returns delta and a human-readable label.
+    """
+    if not baseline or baseline <= 0:
+        return {"delta": 0, "label": "No baseline set", "direction": "neutral"}
+
+    delta = round(stress - baseline, 1)
+    if delta > 10:
+        label = f"{abs(delta)}% above your normal"
+        direction = "up"
+    elif delta < -10:
+        label = f"{abs(delta)}% below your normal"
+        direction = "down"
+    else:
+        label = "Near your normal baseline"
+        direction = "neutral"
+
+    return {"delta": delta, "label": label, "direction": direction}
