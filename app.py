@@ -24,7 +24,7 @@ load_dotenv()
 # ── App setup ─────────────────────────────────────────────────────────────
 app = Flask(__name__)
 # ── DB URL: use Postgres on Vercel (DATABASE_URL), fallback to SQLite locally ──
-raw_db_url = os.environ.get("DATABASE_URL", "sqlite:///neuroscan.db")
+raw_db_url = os.environ.get("DATABASE_URL", "sqlite:///neuroscan.db").strip()
 
 if raw_db_url.startswith("sqlite"):
     db_url = raw_db_url
@@ -33,6 +33,10 @@ else:
     url_obj = make_url(raw_db_url)
     # Force driver to pg8000
     url_obj = url_obj.set(drivername="postgresql+pg8000")
+
+    # Debug: log parsed connection details (visible in Vercel runtime logs)
+    print(f"[DB CONFIG] host={url_obj.host} db={url_obj.database} user={url_obj.username} pw_len={len(url_obj.password or '')}")
+
     # Strip ALL query params — pg8000 doesn't accept libpq-style params
     # (sslmode, channel_binding, etc.) as connect() kwargs. SSL is configured
     # explicitly via connect_args/ssl_context below instead.
@@ -236,6 +240,17 @@ def health():
         status["processed_db_url"] = masked
     except Exception as e:
         status["processed_db_url"] = f"ERROR: {e}"
+    # Show raw env var details (masked) to debug auth issues
+    raw = os.environ.get("DATABASE_URL", "")
+    status["raw_db_url_len"] = len(raw)
+    try:
+        raw_parsed = make_url(raw.strip())
+        status["raw_host"] = raw_parsed.host
+        status["raw_db"] = raw_parsed.database
+        status["raw_user"] = raw_parsed.username
+        status["raw_pw_len"] = len(raw_parsed.password or "")
+    except Exception as e:
+        status["raw_parse_error"] = str(e)
     return jsonify(status)
 
 
