@@ -22,14 +22,51 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ── App setup ─────────────────────────────────────────────────────────────
+import urllib.parse
+
+def safe_parse_db_url(url: str) -> str:
+    """
+    Safely URL-encode the password in the connection string if it contains
+    special characters (like #, ?, @) to prevent parsing errors.
+    """
+    match = re.match(r'^(postgre[sq|s]+://)(.*)$', url)
+    if not match:
+        return url
+    
+    scheme, rest = match.groups()
+    if '@' not in rest:
+        return url
+        
+    r_parts = rest.rsplit('@', 1)
+    creds, host_block = r_parts[0], r_parts[1]
+    
+    if ':' in creds:
+        user, password = creds.split(':', 1)
+    else:
+        user = creds
+        password = ""
+        
+    # Decode first (in case it was already encoded) and then encode safely
+    decoded_password = urllib.parse.unquote(password)
+    encoded_password = urllib.parse.quote_plus(decoded_password)
+    
+    if encoded_password:
+        clean_creds = f"{user}:{encoded_password}"
+    else:
+        clean_creds = user
+        
+    return f"{scheme}{clean_creds}@{host_block}"
+
 app = Flask(__name__)
 # ── DB URL: use Postgres on Vercel (DATABASE_URL), fallback to SQLite locally ──
 raw_db_url = os.environ.get("DATABASE_URL", "sqlite:///neuroscan.db").strip()
 if raw_db_url.startswith("sqlite"):
     db_url = raw_db_url
 else:
+    # Pre-parse to handle special characters in password safely
+    safe_db_url = safe_parse_db_url(raw_db_url)
     # Parse with SQLAlchemy's own URL parser — robust against any query string format
-    url_obj = make_url(raw_db_url)
+    url_obj = make_url(safe_db_url)
     # Force driver to pg8000
     url_obj = url_obj.set(drivername="postgresql+pg8000")
 
