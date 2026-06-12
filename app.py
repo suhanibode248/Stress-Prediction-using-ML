@@ -3,7 +3,7 @@ NeuroScan — Flask backend v4
 Key fix: Claude Vision now correctly separates EMOTIONAL STATE from PHYSIOLOGICAL STRESS.
 Laughing/happy = low face_score. Angry/fearful = high face_score.
 """
-import os, base64, cv2, numpy as np, anthropic, json, re
+import os, base64, anthropic, json, re
 from datetime import datetime, timedelta
 from flask import (Flask, render_template, request, jsonify,
                    redirect, url_for, session, flash)
@@ -22,9 +22,11 @@ load_dotenv()
 app = Flask(__name__)
 # ── DB URL: use Postgres on Vercel (DATABASE_URL), fallback to SQLite locally ──
 db_url = os.environ.get("DATABASE_URL", "sqlite:///neuroscan.db")
-# Vercel/Supabase sometimes give "postgres://" — SQLAlchemy needs "postgresql://"
+# Vercel/Supabase give "postgres://" or "postgresql://" — pg8000 needs "postgresql+pg8000://"
 if db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql://", 1)
+    db_url = db_url.replace("postgres://", "postgresql+pg8000://", 1)
+elif db_url.startswith("postgresql://"):
+    db_url = db_url.replace("postgresql://", "postgresql+pg8000://", 1)
 
 app.config.update(
     SECRET_KEY               = os.environ.get("SECRET_KEY", "neuroscan-dev-change-me"),
@@ -105,24 +107,14 @@ def load_user(uid):
     return db.session.get(User, int(uid))
 
 
-# ── Face Analysis — OpenCV fallback ───────────────────────────────────────
+# ── Face Analysis — lightweight fallback (no OpenCV, Vercel-friendly) ─────
 def analyze_face_cv(image_data: str) -> float:
-    try:
-        raw  = base64.b64decode(image_data.split(",")[1])
-        arr  = np.frombuffer(raw, np.uint8)
-        img  = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-        if img is None: return 50
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        cascade = cv2.CascadeClassifier(
-            cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-        )
-        faces = cascade.detectMultiScale(gray, 1.1, 5)
-        if len(faces) == 0: return 50
-        x, y, w, h = faces[0]
-        ratio = (w * h) / (img.shape[0] * img.shape[1])
-        return min(95, max(20, int(ratio * 300 + 30)))
-    except:
-        return 50
+    """
+    Fallback when Claude Vision is disabled/unavailable.
+    No heavy CV dependencies — just returns a neutral baseline.
+    Claude Vision should be the primary path (use_claude=True).
+    """
+    return 50.0
 
 
 # ── Face Analysis — Claude Vision (FIXED prompt) ──────────────────────────
@@ -435,8 +427,11 @@ def emotions_summary():
 
 
 # ── Init DB ───────────────────────────────────────────────────────────────
-with app.app_context():
-    db.create_all()
+try:
+    with app.app_context():
+        db.create_all()
+except Exception as e:
+    print(f"[DB INIT ERROR] {e}")
 
 # Local dev only — Vercel uses the `app` object directly via @vercel/python
 if __name__ == "__main__":
