@@ -13,6 +13,7 @@ from flask_login import (LoginManager, UserMixin, login_user,
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import bcrypt
+import ssl
 from sqlalchemy.pool import NullPool
 from sqlalchemy.engine import make_url
 from model import calculate_stress
@@ -21,62 +22,21 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ── App setup ─────────────────────────────────────────────────────────────
-import urllib.parse
-
-def safe_parse_db_url(url: str) -> str:
-    """
-    Safely URL-encode the password in the connection string if it contains
-    special characters (like #, ?, @) to prevent parsing errors.
-    Also normalises postgres:// -> postgresql:// for SQLAlchemy 2.x.
-    """
-    # Normalise the scheme
-    url = re.sub(r'^postgres://', 'postgresql://', url)
-
-    match = re.match(r'^(postgresql://)(.*)$', url)
-    if not match:
-        return url
-
-    scheme, rest = match.groups()
-    if '@' not in rest:
-        return url
-
-    r_parts = rest.rsplit('@', 1)
-    creds, host_block = r_parts[0], r_parts[1]
-
-    if ':' in creds:
-        user, password = creds.split(':', 1)
-    else:
-        user = creds
-        password = ""
-
-    # Decode first (in case it was already encoded) and then encode safely
-    decoded_password = urllib.parse.unquote(password)
-    encoded_password = urllib.parse.quote_plus(decoded_password)
-
-    if encoded_password:
-        clean_creds = f"{user}:{encoded_password}"
-    else:
-        clean_creds = user
-
-    return f"{scheme}{clean_creds}@{host_block}"
-
 app = Flask(__name__)
 # ── DB URL: use Postgres on Vercel (DATABASE_URL), fallback to SQLite locally ──
-raw_db_url = os.environ.get("DATABASE_URL", "sqlite:///neuroscan.db").strip()
+raw_db_url = os.environ.get("DATABASE_URL", "sqlite:///neuroscan.db")
+
 if raw_db_url.startswith("sqlite"):
     db_url = raw_db_url
 else:
-    # Pre-parse to handle special characters in password & normalise scheme
-    safe_db_url = safe_parse_db_url(raw_db_url)
-    # Parse with SQLAlchemy's own URL parser
-    url_obj = make_url(safe_db_url)
-    # Use psycopg2 — better Neon/PgBouncer SCRAM-SHA-256 compatibility than pg8000
-    url_obj = url_obj.set(drivername="postgresql+psycopg2")
-
-    # Debug: log parsed connection details (visible in Vercel runtime logs)
-    print(f"[DB CONFIG] host={url_obj.host} db={url_obj.database} user={url_obj.username} pw_len={len(url_obj.password or '')}")
-
-    # Keep sslmode=require in query string — psycopg2 handles it via libpq
+    # Parse with SQLAlchemy's own URL parser — robust against any query string format
+    url_obj = make_url(raw_db_url)
+    # Force driver to pg8000
+    url_obj = url_obj.set(drivername="postgresql+pg8000")
+    # Strip ALL query params — pg8000 doesn't accept libpq-style params
+    # (sslmode, channel_binding, etc.) as connect() kwargs. SSL is configured
+    # explicitly via connect_args/ssl_context below instead.
+    url_obj = url_obj.set(query={})
     db_url = str(url_obj)
 
 app.config.update(
@@ -88,10 +48,16 @@ app.config.update(
     SESSION_COOKIE_SAMESITE  = "Lax",
 )
 
-# ── psycopg2 + hosted Postgres (Neon) pooling config ────────────────────────
-if "psycopg2" in db_url:
+# ── pg8000 + hosted Postgres (Neon/Supabase) SSL & pooling config ──────────
+if "pg8000" in db_url:
+    ssl_ctx = ssl.create_default_context()
+    ssl_ctx.check_hostname = False
+    ssl_ctx.verify_mode = ssl.CERT_NONE
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
         "poolclass": NullPool,
+        "connect_args": {
+            "ssl_context": ssl_ctx,
+        },
     }
 
 db            = SQLAlchemy(app)
@@ -204,12 +170,6 @@ If no face is visible: {"face_score": 50, "emotion": "unknown", "tension": "medi
 
 
 def analyze_face_claude(image_data: str) -> dict:
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        return {
-            "face_score": 50, "emotion": "unknown",
-            "tension": "medium", "confidence": 50,
-            "stress_indicators": [], "emotional_valence": "neutral"
-        }
     try:
         b64 = image_data.split(",")[1] if "," in image_data else image_data
         msg = client.messages.create(
@@ -276,17 +236,6 @@ def health():
         status["processed_db_url"] = masked
     except Exception as e:
         status["processed_db_url"] = f"ERROR: {e}"
-    # Show raw env var details (masked) to debug auth issues
-    raw = os.environ.get("DATABASE_URL", "")
-    status["raw_db_url_len"] = len(raw)
-    try:
-        raw_parsed = make_url(raw.strip())
-        status["raw_host"] = raw_parsed.host
-        status["raw_db"] = raw_parsed.database
-        status["raw_user"] = raw_parsed.username
-        status["raw_pw_len"] = len(raw_parsed.password or "")
-    except Exception as e:
-        status["raw_parse_error"] = str(e)
     return jsonify(status)
 
 
