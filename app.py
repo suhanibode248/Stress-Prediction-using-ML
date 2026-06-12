@@ -173,6 +173,12 @@ If no face is visible: {"face_score": 50, "emotion": "unknown", "tension": "medi
 
 
 def analyze_face_claude(image_data: str) -> dict:
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return {
+            "face_score": 50, "emotion": "unknown",
+            "tension": "medium", "confidence": 50,
+            "stress_indicators": [], "emotional_valence": "neutral"
+        }
     try:
         b64 = image_data.split(",")[1] if "," in image_data else image_data
         msg = client.messages.create(
