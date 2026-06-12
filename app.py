@@ -24,11 +24,19 @@ load_dotenv()
 app = Flask(__name__)
 # ── DB URL: use Postgres on Vercel (DATABASE_URL), fallback to SQLite locally ──
 db_url = os.environ.get("DATABASE_URL", "sqlite:///neuroscan.db")
-# Vercel/Supabase give "postgres://" or "postgresql://" — pg8000 needs "postgresql+pg8000://"
+# Vercel/Supabase/Neon give "postgres://" or "postgresql://" — pg8000 needs "postgresql+pg8000://"
 if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql+pg8000://", 1)
 elif db_url.startswith("postgresql://"):
     db_url = db_url.replace("postgresql://", "postgresql+pg8000://", 1)
+
+# pg8000 doesn't understand "?sslmode=require" (psycopg2-style) — strip it.
+# SSL is configured separately below via connect_args/ssl_context.
+if "?" in db_url:
+    base_url, query = db_url.split("?", 1)
+    # Drop sslmode and channel_binding params (psycopg2/libpq specific, pg8000 chokes on them)
+    params = [p for p in query.split("&") if not p.startswith(("sslmode=", "channel_binding="))]
+    db_url = base_url + ("?" + "&".join(params) if params else "")
 
 app.config.update(
     SECRET_KEY               = os.environ.get("SECRET_KEY", "neuroscan-dev-change-me"),
@@ -39,10 +47,10 @@ app.config.update(
     SESSION_COOKIE_SAMESITE  = "Lax",
 )
 
-# ── Supabase pooler (pgbouncer) compatibility ──────────────────────────────
-# pgbouncer in transaction mode doesn't support prepared statements / server-side
-# cursors well. Disable connection pooling on our side (pooler handles it) and
-# turn off prepared statement caching.
+# ── pg8000 + hosted Postgres (Neon/Supabase) SSL & pooling config ──────────
+# Serverless functions are short-lived — disable SQLAlchemy's own pooling
+# (NullPool) and let pg8000 negotiate SSL via an explicit SSLContext, since
+# pg8000 doesn't accept the libpq-style "?sslmode=require" query param.
 if "pg8000" in db_url:
     ssl_ctx = ssl.create_default_context()
     ssl_ctx.check_hostname = False
