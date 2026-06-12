@@ -13,6 +13,8 @@ from flask_login import (LoginManager, UserMixin, login_user,
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import bcrypt
+import ssl
+from sqlalchemy.pool import NullPool
 from model import calculate_stress
 from dotenv import load_dotenv
 
@@ -36,6 +38,21 @@ app.config.update(
     SESSION_COOKIE_SECURE    = os.environ.get("VERCEL") is not None,
     SESSION_COOKIE_SAMESITE  = "Lax",
 )
+
+# ── Supabase pooler (pgbouncer) compatibility ──────────────────────────────
+# pgbouncer in transaction mode doesn't support prepared statements / server-side
+# cursors well. Disable connection pooling on our side (pooler handles it) and
+# turn off prepared statement caching.
+if "pg8000" in db_url:
+    ssl_ctx = ssl.create_default_context()
+    ssl_ctx.check_hostname = False
+    ssl_ctx.verify_mode = ssl.CERT_NONE
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "poolclass": NullPool,
+        "connect_args": {
+            "ssl_context": ssl_ctx,
+        },
+    }
 
 db            = SQLAlchemy(app)
 login_manager = LoginManager(app)
