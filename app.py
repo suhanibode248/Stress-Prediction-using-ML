@@ -23,21 +23,25 @@ load_dotenv()
 
 # ── App setup ─────────────────────────────────────────────────────────────
 app = Flask(__name__)
-# ── DB URL: use Postgres on Vercel (DATABASE_URL), fallback to SQLite locally ──
-raw_db_url = os.environ.get("DATABASE_URL", "sqlite:///neuroscan.db")
 
-if raw_db_url.startswith("sqlite"):
-    db_url = raw_db_url
-else:
-    # Parse with SQLAlchemy's own URL parser — robust against any query string format
-    url_obj = make_url(raw_db_url)
-    # Force driver to pg8000
-    url_obj = url_obj.set(drivername="postgresql+pg8000")
-    # Strip ALL query params — pg8000 doesn't accept libpq-style params
-    # (sslmode, channel_binding, etc.) as connect() kwargs. SSL is configured
-    # explicitly via connect_args/ssl_context below instead.
-    url_obj = url_obj.set(query={})
-    db_url = str(url_obj)
+# ── DB URL: use Postgres (DATABASE_URL), fallback to SQLite locally ────────
+# Wrapped in try/except — if ANYTHING here fails, fall back to SQLite so the
+# app still boots and /health can report the real error instead of a blank
+# FUNCTION_INVOCATION_FAILED crash.
+raw_db_url = os.environ.get("DATABASE_URL", "sqlite:///neuroscan.db")
+db_url_error = None
+
+try:
+    if raw_db_url.startswith("sqlite"):
+        db_url = raw_db_url
+    else:
+        url_obj = make_url(raw_db_url)
+        url_obj = url_obj.set(drivername="postgresql+pg8000")
+        url_obj = url_obj.set(query={})
+        db_url = str(url_obj)
+except Exception as e:
+    db_url_error = str(e)
+    db_url = "sqlite:///neuroscan.db"
 
 app.config.update(
     SECRET_KEY               = os.environ.get("SECRET_KEY", "neuroscan-dev-change-me"),
@@ -49,31 +53,45 @@ app.config.update(
 )
 
 # ── pg8000 + hosted Postgres (Neon/Supabase) SSL & pooling config ──────────
-if "pg8000" in db_url:
-    ssl_ctx = ssl.create_default_context()
-    ssl_ctx.check_hostname = False
-    ssl_ctx.verify_mode = ssl.CERT_NONE
-    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-        "poolclass": NullPool,
-        "connect_args": {
-            "ssl_context": ssl_ctx,
-        },
-    }
+try:
+    if "pg8000" in db_url:
+        ssl_ctx = ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = ssl.CERT_NONE
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+            "poolclass": NullPool,
+            "connect_args": {
+                "ssl_context": ssl_ctx,
+            },
+        }
+except Exception as e:
+    if not db_url_error:
+        db_url_error = str(e)
 
 db            = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
 
-# ── Rate limiter: use Upstash Redis on Vercel, memory locally ──────────────
+# ── Rate limiter: use Redis if configured, memory otherwise ────────────────
+# Wrapped because a bad/unreachable Redis URL can throw at init time.
 redis_url = os.environ.get("UPSTASH_REDIS_URL") or os.environ.get("REDIS_URL")
-limiter = Limiter(
-    get_remote_address,
-    app=app,
-    default_limits=["300 per day", "60 per hour"],
-    storage_uri=redis_url if redis_url else "memory://",
-)
+try:
+    limiter = Limiter(
+        get_remote_address,
+        app=app,
+        default_limits=["300 per day", "60 per hour"],
+        storage_uri=redis_url if redis_url else "memory://",
+    )
+except Exception as e:
+    print(f"[LIMITER INIT ERROR] {e}")
+    limiter = Limiter(get_remote_address, app=app, default_limits=["300 per day", "60 per hour"])
 
-client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
+# ── Anthropic client — never crash at import even if key is missing ───────
+try:
+    client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY") or "missing-key")
+except Exception as e:
+    print(f"[ANTHROPIC INIT ERROR] {e}")
+    client = None
 
 
 # ── DB Models ─────────────────────────────────────────────────────────────
@@ -170,6 +188,12 @@ If no face is visible: {"face_score": 50, "emotion": "unknown", "tension": "medi
 
 
 def analyze_face_claude(image_data: str) -> dict:
+    if client is None:
+        return {
+            "face_score": 50, "emotion": "unknown",
+            "tension": "medium", "confidence": 30,
+            "stress_indicators": [], "emotional_valence": "neutral"
+        }
     try:
         b64 = image_data.split(",")[1] if "," in image_data else image_data
         msg = client.messages.create(
@@ -236,7 +260,22 @@ def health():
         status["processed_db_url"] = masked
     except Exception as e:
         status["processed_db_url"] = f"ERROR: {e}"
+    status["db_url_setup_error"] = db_url_error
+    status["anthropic_client_ok"] = client is not None
     return jsonify(status)
+
+
+@app.errorhandler(Exception)
+def handle_any_error(e):
+    """Catch-all: never let an unhandled exception crash the serverless function silently."""
+    import traceback
+    tb = traceback.format_exc()
+    print(f"[UNHANDLED ERROR] {tb}")
+    return jsonify({
+        "error": str(e),
+        "type": type(e).__name__,
+        "path": request.path
+    }), 500
 
 
 @app.route("/")
