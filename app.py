@@ -24,7 +24,7 @@ load_dotenv()
 # ── App setup ─────────────────────────────────────────────────────────────
 app = Flask(__name__)
 # ── DB URL: use Postgres on Vercel (DATABASE_URL), fallback to SQLite locally ──
-raw_db_url = os.environ.get("DATABASE_URL", "sqlite:///neuroscan.db").strip()
+raw_db_url = "postgresql://neondb_owner:npg_uDm7OBzaS2st@ep-morning-frog-at2tx1gt-pooler.c-9.us-east-1.aws.neon.tech/neondb"
 
 if raw_db_url.startswith("sqlite"):
     db_url = raw_db_url
