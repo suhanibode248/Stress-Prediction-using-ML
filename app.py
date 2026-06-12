@@ -15,6 +15,7 @@ from flask_limiter.util import get_remote_address
 import bcrypt
 import ssl
 from sqlalchemy.pool import NullPool
+from sqlalchemy.engine import make_url
 from model import calculate_stress
 from dotenv import load_dotenv
 
@@ -23,20 +24,20 @@ load_dotenv()
 # ── App setup ─────────────────────────────────────────────────────────────
 app = Flask(__name__)
 # ── DB URL: use Postgres on Vercel (DATABASE_URL), fallback to SQLite locally ──
-db_url = os.environ.get("DATABASE_URL", "sqlite:///neuroscan.db")
-# Vercel/Supabase/Neon give "postgres://" or "postgresql://" — pg8000 needs "postgresql+pg8000://"
-if db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql+pg8000://", 1)
-elif db_url.startswith("postgresql://"):
-    db_url = db_url.replace("postgresql://", "postgresql+pg8000://", 1)
+raw_db_url = os.environ.get("DATABASE_URL", "sqlite:///neuroscan.db")
 
-# pg8000 doesn't understand "?sslmode=require" (psycopg2-style) — strip it.
-# SSL is configured separately below via connect_args/ssl_context.
-if "?" in db_url:
-    base_url, query = db_url.split("?", 1)
-    # Drop sslmode and channel_binding params (psycopg2/libpq specific, pg8000 chokes on them)
-    params = [p for p in query.split("&") if not p.startswith(("sslmode=", "channel_binding="))]
-    db_url = base_url + ("?" + "&".join(params) if params else "")
+if raw_db_url.startswith("sqlite"):
+    db_url = raw_db_url
+else:
+    # Parse with SQLAlchemy's own URL parser — robust against any query string format
+    url_obj = make_url(raw_db_url)
+    # Force driver to pg8000
+    url_obj = url_obj.set(drivername="postgresql+pg8000")
+    # Strip ALL query params — pg8000 doesn't accept libpq-style params
+    # (sslmode, channel_binding, etc.) as connect() kwargs. SSL is configured
+    # explicitly via connect_args/ssl_context below instead.
+    url_obj = url_obj.set(query={})
+    db_url = str(url_obj)
 
 app.config.update(
     SECRET_KEY               = os.environ.get("SECRET_KEY", "neuroscan-dev-change-me"),
@@ -48,9 +49,6 @@ app.config.update(
 )
 
 # ── pg8000 + hosted Postgres (Neon/Supabase) SSL & pooling config ──────────
-# Serverless functions are short-lived — disable SQLAlchemy's own pooling
-# (NullPool) and let pg8000 negotiate SSL via an explicit SSLContext, since
-# pg8000 doesn't accept the libpq-style "?sslmode=require" query param.
 if "pg8000" in db_url:
     ssl_ctx = ssl.create_default_context()
     ssl_ctx.check_hostname = False
@@ -232,6 +230,12 @@ def health():
     status["anthropic_key_set"] = bool(os.environ.get("ANTHROPIC_API_KEY"))
     status["secret_key_set"] = bool(os.environ.get("SECRET_KEY"))
     status["redis_set"] = bool(os.environ.get("UPSTASH_REDIS_URL") or os.environ.get("REDIS_URL"))
+    # Show the PROCESSED connection string with password masked, for debugging
+    try:
+        masked = make_url(db_url).render_as_string(hide_password=True)
+        status["processed_db_url"] = masked
+    except Exception as e:
+        status["processed_db_url"] = f"ERROR: {e}"
     return jsonify(status)
 
 
