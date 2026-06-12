@@ -1,5 +1,5 @@
 """
-NeuroScan — Flask backend v4 (Vercel-compatible)
+NeuroScan — Flask backend v4
 Key fix: Claude Vision now correctly separates EMOTIONAL STATE from PHYSIOLOGICAL STRESS.
 Laughing/happy = low face_score. Angry/fearful = high face_score.
 """
@@ -20,32 +20,32 @@ load_dotenv()
 
 # ── App setup ─────────────────────────────────────────────────────────────
 app = Flask(__name__)
-
-# IMPORTANT: On Vercel, SQLite won't persist between requests.
-# Use a hosted DB (e.g. PlanetScale, Supabase, Neon) via DATABASE_URL env var.
-# Falls back to SQLite for local dev only.
-DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///neuroscan.db")
-# Fix for SQLAlchemy: Postgres URLs from some hosts use "postgres://" but
-# SQLAlchemy 1.4+ requires "postgresql://"
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+# ── DB URL: use Postgres on Vercel (DATABASE_URL), fallback to SQLite locally ──
+db_url = os.environ.get("DATABASE_URL", "sqlite:///neuroscan.db")
+# Vercel/Supabase sometimes give "postgres://" — SQLAlchemy needs "postgresql://"
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
 
 app.config.update(
     SECRET_KEY               = os.environ.get("SECRET_KEY", "neuroscan-dev-change-me"),
-    SQLALCHEMY_DATABASE_URI  = DATABASE_URL,
+    SQLALCHEMY_DATABASE_URI  = db_url,
     SQLALCHEMY_TRACK_MODIFICATIONS = False,
     PERMANENT_SESSION_LIFETIME = timedelta(days=7),
+    SESSION_COOKIE_SECURE    = os.environ.get("VERCEL") is not None,
+    SESSION_COOKIE_SAMESITE  = "Lax",
 )
 
 db            = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
 
+# ── Rate limiter: use Upstash Redis on Vercel, memory locally ──────────────
+redis_url = os.environ.get("UPSTASH_REDIS_URL") or os.environ.get("REDIS_URL")
 limiter = Limiter(
     get_remote_address,
     app=app,
     default_limits=["300 per day", "60 per hour"],
-    storage_uri="memory://",
+    storage_uri=redis_url if redis_url else "memory://",
 )
 
 client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
@@ -125,7 +125,7 @@ def analyze_face_cv(image_data: str) -> float:
         return 50
 
 
-# ── Face Analysis — Claude Vision ─────────────────────────────────────────
+# ── Face Analysis — Claude Vision (FIXED prompt) ──────────────────────────
 CLAUDE_VISION_PROMPT = """You are a biometric stress analysis AI. Your job is to estimate PHYSIOLOGICAL STRESS from facial cues — NOT emotional expression.
 
 CRITICAL RULES:
@@ -174,16 +174,20 @@ def analyze_face_claude(image_data: str) -> dict:
         text = re.sub(r"```json|```", "", msg.content[0].text.strip()).strip()
         result = json.loads(text)
 
-        emotion    = result.get("emotion", "neutral").lower()
+        # Safety clamp: if emotion is happy/laughing but face_score is high, correct it
+        emotion = result.get("emotion", "neutral").lower()
         face_score = result.get("face_score", 50)
+        valence = result.get("emotional_valence", "neutral")
 
         POSITIVE_EMOTIONS = {"happy", "laughing", "amused", "joyful", "excited", "content", "smiling"}
         if emotion in POSITIVE_EMOTIONS and face_score > 30:
+            # Cap stress at 30 for genuinely positive emotions unless tension says otherwise
             tension = result.get("tension", "low")
             if tension == "low":
                 result["face_score"] = min(face_score, 20)
             elif tension == "medium":
                 result["face_score"] = min(face_score, 35)
+            # high tension + happy = forced smile, keep as-is
 
         print(f"[Claude Vision] emotion={emotion} face_score={result['face_score']} tension={result.get('tension')} indicators={result.get('stress_indicators', [])}")
         return result
@@ -258,7 +262,7 @@ def dashboard():
         daily.setdefault(key, []).append(r.stress)
     heatmap = {k: round(sum(v)/len(v), 1) for k, v in daily.items()}
 
-    sessions       = ScanSession.query.filter_by(user_id=current_user.id).order_by(ScanSession.started_at.desc()).limit(10).all()
+    sessions      = ScanSession.query.filter_by(user_id=current_user.id).order_by(ScanSession.started_at.desc()).limit(10).all()
     total_sessions = ScanSession.query.filter_by(user_id=current_user.id).count()
     week_sessions  = ScanSession.query.filter(
         ScanSession.user_id==current_user.id,
@@ -324,11 +328,11 @@ def session_stop():
     s = db.session.get(ScanSession, sid)
     if s and s.user_id == current_user.id:
         data = request.get_json(force=True) or {}
-        s.ended_at      = datetime.utcnow()
-        s.avg_stress    = data.get("avg_stress", 0)
-        s.peak_stress   = data.get("peak_stress", 0)
-        s.readings      = data.get("readings", 0)
-        s.readings_json = json.dumps(data.get("stress_values", []))
+        s.ended_at       = datetime.utcnow()
+        s.avg_stress     = data.get("avg_stress", 0)
+        s.peak_stress    = data.get("peak_stress", 0)
+        s.readings       = data.get("readings", 0)
+        s.readings_json  = json.dumps(data.get("stress_values", []))
         db.session.commit()
         session.pop("active_session_id", None)
     return jsonify({"ok": True})
@@ -370,6 +374,7 @@ def analyze():
         )
         result.update(extra)
 
+        # Persist reading with all metrics
         sid = session.get("active_session_id")
         r = Reading(
             session_id = sid,
@@ -429,10 +434,10 @@ def emotions_summary():
     return jsonify(counts)
 
 
-# ── DB init (runs on cold start in serverless) ────────────────────────────
+# ── Init DB ───────────────────────────────────────────────────────────────
 with app.app_context():
     db.create_all()
 
-# ── Vercel entrypoint — DO NOT add if __name__ == "__main__" block ────────
-# Vercel imports `app` directly from this module.
-# For local dev, run: flask --app app run --debug
+# Local dev only — Vercel uses the `app` object directly via @vercel/python
+if __name__ == "__main__":
+    app.run(debug=True, port=5000)
