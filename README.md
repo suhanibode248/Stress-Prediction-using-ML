@@ -1,3 +1,9 @@
+## Live Demo
+
+🔗 **Deployment Link:** [Click Here to View Project](https://stress-prediction-using-ml.onrender.com)
+
+You can access and test the complete working project using the live deployment link above.
+
 #  Stress Prediction Using Machine Learning
 ---
 ###  Author  
