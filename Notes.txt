@@ -238,7 +238,7 @@ This is an academic/professional project focused on:
 
 10. PROJECT LINK
 ========================
-Repository: [GitHub Repository would be here]
+Repository: [https://github.com/suhanibode248/Stress-Prediction-using-ML.git]
 Live Demo: [https://stress-prediction-using-ml.onrender.com/login]
 Documentation: README.md in project root
 
