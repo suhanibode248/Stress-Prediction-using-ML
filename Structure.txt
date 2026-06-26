@@ -1,0 +1,66 @@
+PROJECT STRUCTURE - Stress Detection (NeuroScan)
+================================================
+
+stress detection/
+│
+├── app.py                          # Main Flask application with routes and logic
+│
+├── model.py                        # Machine learning model for stress calculation
+│
+├── migrate.py                      # Database migration script
+│
+├── test_db.py                      # Database testing utilities
+│
+├── requirements.txt                # Python dependencies
+│
+├── vercel.json                     # Deployment configuration for Vercel
+│
+├── README.md                       # Project documentation
+│
+├── instance/
+│   └── neuroscan.db               # SQLite database (local storage)
+│
+├── models/
+│   └── emotion_model.hdf5         # Pre-trained emotion recognition model
+│
+├── static/                         # Frontend assets
+│   ├── style.css                  # Main CSS styling
+│   ├── script.js                  # Main JavaScript functionality
+│   └── js/
+│       ├── blink.js               # Eye blink detection script
+│       └── voice.js               # Voice/audio processing script
+│
+├── templates/                      # HTML templates
+│   ├── index.html                 # Home/landing page
+│   ├── login.html                 # User login page
+│   ├── dashboard.html             # Main dashboard with analysis
+│   ├── history.html               # User history and past records
+│   └── settings.html              # User settings page
+│
+└── __pycache__/                    # Python cache files
+
+
+KEY FILES BREAKDOWN
+===================
+
+Backend:
+- app.py: Flask server, routes, user authentication, database operations
+- model.py: Stress calculation algorithms using physiological data
+- requirements.txt: Flask, SQLAlchemy, Login, Limiter, Anthropic API, etc.
+
+Frontend:
+- index.html: Main interface with webcam/audio input
+- dashboard.html: Real-time stress analysis visualization
+- login.html: User authentication interface
+- history.html: Past analysis records
+- settings.html: User preferences and configuration
+
+Assets:
+- style.css: Responsive CSS styling
+- script.js: Core JavaScript logic
+- blink.js: Eye blink detection (facial recognition)
+- voice.js: Voice/emotion analysis
+
+Database:
+- neuroscan.db: SQLite database storing users and stress records
+- emotion_model.hdf5: Pre-trained neural network for emotion detection
